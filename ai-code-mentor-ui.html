@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Code Mentor - Dashboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:#0b0e17; color:#e2e4e9;
+}
+.container { display:flex; height:100vh; overflow:hidden; }
+
+/* SIDEBAR */
+.sidebar {
+  width:230px; background:#12151f; border-right:1px solid #232838;
+  display:flex; flex-direction:column; padding:20px 16px;
+}
+.logo { display:flex; align-items:center; gap:10px; margin-bottom:28px; }
+.logo-icon {
+  width:34px; height:34px; border-radius:9px;
+  background:linear-gradient(135deg,#6366f1,#a855f7);
+  display:flex; align-items:center; justify-content:center; color:#fff; font-size:14px;
+}
+.logo-text h2 { font-size:14px; font-weight:600; color:#fff; }
+.logo-text p { font-size:10px; color:#7a8199; }
+
+.nav { display:flex; flex-direction:column; gap:4px; flex:1; }
+.nav-item {
+  display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px;
+  font-size:13px; color:#8b91a7; cursor:pointer; transition:.2s;
+}
+.nav-item:hover { background:#1a1e2c; color:#e2e4e9; }
+.nav-item.active { background:#1e2333; color:#a78bfa; }
+.nav-item i { width:16px; text-align:center; font-size:14px; }
+
+.user-box {
+  background:#1a1e2c; border-radius:10px; padding:14px; margin-top:12px;
+}
+.user-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.user-avatar {
+  width:34px; height:34px; border-radius:50%;
+  background:linear-gradient(135deg,#6366f1,#a855f7);
+  display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:13px;
+}
+.user-name { font-size:12px; font-weight:600; color:#fff; }
+.user-role { font-size:10px; color:#7a8199; }
+.user-tagline { font-size:11px; color:#a78bfa; margin-bottom:8px; }
+
+/* MAIN */
+.main { flex:1; display:flex; flex-direction:column; overflow-y:auto; }
+.header {
+  padding:20px 28px; display:flex; justify-content:space-between; align-items:flex-start;
+  border-bottom:1px solid #1c2030;
+}
+.header h1 { font-size:20px; font-weight:600; color:#fff; }
+.header p { font-size:12px; color:#7a8199; margin-top:4px; }
+.header-actions { display:flex; gap:10px; align-items:center; }
+.btn-new {
+  background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; border:none;
+  padding:9px 16px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;
+  display:flex; align-items:center; gap:6px;
+}
+
+.grid {
+  display:grid; grid-template-columns: 2fr 1fr; gap:20px; padding:24px;
+}
+
+.card {
+  background:#12151f; border:1px solid #1c2030; border-radius:14px; padding:18px;
+}
+
+/* CODE PANEL */
+.code-panel-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.filename { display:flex; align-items:center; gap:8px; font-size:13px; color:#e2e4e9; }
+.filename i { color:#f59e0b; }
+.btn-clear { background:transparent; border:1px solid #2a3049; color:#8b91a7; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer; }
+
+.editor {
+  background:#0e1119; border:1px solid #1c2030; border-radius:10px; overflow:hidden; margin-bottom:14px;
+}
+.editor textarea {
+  width:100%; height:280px; background:transparent; border:none; color:#d4d7e0;
+  font-family:'JetBrains Mono','Courier New',monospace; font-size:12.5px; line-height:1.6;
+  padding:14px; resize:vertical; outline:none;
+}
+.editor textarea::placeholder { color:#4a5068; }
+
+.editor-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.btn-secondary {
+  background:#1a1e2c; border:1px solid #2a3049; color:#c4c7d4; padding:9px 14px;
+  border-radius:8px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px;
+}
+.btn-analyze {
+  margin-left:auto; background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; border:none;
+  padding:10px 20px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;
+  display:flex; align-items:center; gap:8px;
+}
+.btn-analyze:disabled { opacity:.5; cursor:not-allowed; }
+.hint-note { font-size:11px; color:#5a6080; margin-top:8px; }
+
+/* FEEDBACK CATEGORY GRID */
+.cat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:20px; }
+.cat-card { border-radius:12px; padding:14px; border:1px solid; min-height:120px; }
+.cat-card.critical { background:rgba(239,68,68,.06); border-color:rgba(239,68,68,.25); }
+.cat-card.improvement { background:rgba(245,158,11,.06); border-color:rgba(245,158,11,.25); }
+.cat-card.learning { background:rgba(6,182,212,.06); border-color:rgba(6,182,212,.25); }
+.cat-card.good { background:rgba(16,185,129,.06); border-color:rgba(16,185,129,.25); }
+.cat-title { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; margin-bottom:10px; }
+.cat-title.critical { color:#f87171; }
+.cat-title.improvement { color:#fbbf24; }
+.cat-title.learning { color:#67e8f9; }
+.cat-title.good { color:#6ee7b7; }
+.cat-item { margin-bottom:10px; }
+.cat-item h5 { font-size:11.5px; color:#e2e4e9; margin-bottom:2px; }
+.cat-item p { font-size:10.5px; color:#8b91a7; line-height:1.4; }
+.cat-empty { font-size:11px; color:#5a6080; font-style:italic; }
+
+/* PROGRESS CHART CARD */
+.progress-card { grid-column:1 / -1; margin-top:20px; }
+.progress-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; }
+.progress-stats { display:flex; gap:28px; }
+.pstat-num { font-size:22px; font-weight:700; color:#fff; }
+.pstat-label { font-size:10px; color:#7a8199; text-transform:uppercase; letter-spacing:.4px; }
+#progressChart { width:100%; height:160px; }
+
+/* RIGHT COLUMN */
+.right-col { display:flex; flex-direction:column; gap:20px; }
+
+.score-card { text-align:center; }
+.score-card-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.score-card-head span { font-size:13px; font-weight:600; color:#e2e4e9; }
+.score-ring-wrap { position:relative; width:150px; height:150px; margin:0 auto 12px; }
+.score-ring-wrap svg { transform:rotate(-90deg); }
+.score-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.score-center .num { font-size:34px; font-weight:700; color:#fff; }
+.score-center .den { font-size:11px; color:#7a8199; }
+.score-msg { font-size:12px; color:#c4c7d4; margin-bottom:16px; line-height:1.5; }
+.score-breakdown { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.sb-item { text-align:center; }
+.sb-num { font-size:18px; font-weight:700; }
+.sb-num.critical { color:#f87171; }
+.sb-num.improvement { color:#fbbf24; }
+.sb-num.learning { color:#67e8f9; }
+.sb-num.good { color:#6ee7b7; }
+.sb-label { font-size:9.5px; color:#7a8199; margin-top:2px; }
+
+/* MENTOR MODE */
+.mentor-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.mentor-head span { font-size:13px; font-weight:600; color:#e2e4e9; }
+.mentor-step { font-size:10.5px; color:#a78bfa; background:#1e2333; padding:3px 8px; border-radius:6px; }
+.mentor-box { background:#161a28; border:1px solid #232838; border-radius:10px; padding:14px; margin-bottom:12px; min-height:70px; }
+.mentor-box p { font-size:12.5px; color:#e2e4e9; line-height:1.5; }
+.mentor-box .sub { font-size:11px; color:#7a8199; margin-top:6px; }
+.mentor-nav { display:flex; gap:8px; }
+.mentor-nav button {
+  flex:1; background:#1a1e2c; border:1px solid #2a3049; color:#c4c7d4; padding:8px; border-radius:7px;
+  font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.mentor-nav button.primary { background:linear-gradient(135deg,#6366f1,#a855f7); color:#fff; border:none; }
+.mentor-nav button:disabled { opacity:.4; cursor:not-allowed; }
+.mentor-footer { font-size:10.5px; color:#5a6080; margin-top:10px; text-align:center; }
+
+/* RECENT ANALYSES */
+.recent-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.recent-head span { font-size:13px; font-weight:600; color:#e2e4e9; }
+.recent-head a { font-size:11px; color:#a78bfa; text-decoration:none; cursor:pointer; }
+.recent-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #1c2030; }
+.recent-item:last-child { border-bottom:none; }
+.recent-icon { width:30px; height:30px; border-radius:7px; background:#1e2333; display:flex; align-items:center; justify-content:center; color:#a78bfa; font-size:12px; }
+.recent-info { flex:1; min-width:0; }
+.recent-info h5 { font-size:12px; color:#e2e4e9; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.recent-info p { font-size:10.5px; color:#7a8199; margin-top:2px; }
+.recent-badge { font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; white-space:nowrap; }
+.recent-badge.good { background:rgba(16,185,129,.15); color:#6ee7b7; }
+.recent-badge.bad { background:rgba(239,68,68,.15); color:#f87171; }
+.recent-badge.ok { background:rgba(245,158,11,.15); color:#fbbf24; }
+.empty-note { font-size:11.5px; color:#5a6080; text-align:center; padding:20px 0; }
+
+.loading-spin { width:32px; height:32px; border:3px solid #232838; border-top:3px solid #a855f7; border-radius:50%; animation:spin 1s linear infinite; margin:20px auto; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+.status-banner { font-size:11px; padding:8px 12px; border-radius:8px; margin-bottom:14px; display:none; }
+.status-banner.show { display:block; }
+.status-banner.err { background:rgba(239,68,68,.1); color:#f87171; border:1px solid rgba(239,68,68,.3); }
+.status-banner.warn { background:rgba(245,158,11,.1); color:#fbbf24; border:1px solid rgba(245,158,11,.3); }
+
+@media (max-width:1100px) {
+  .grid { grid-template-columns:1fr; }
+  .cat-grid { grid-template-columns:repeat(2,1fr); }
+}
+@media (max-width:700px) {
+  .sidebar { display:none; }
+  .cat-grid { grid-template-columns:1fr; }
+  .progress-stats { flex-wrap:wrap; gap:16px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon"><i class="fas fa-code"></i></div>
+      <div class="logo-text"><h2>AI Code Mentor</h2><p>Learn. Improve. Grow.</p></div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" data-view="dashboard"><i class="fas fa-house"></i> Dashboard</div>
+      <div class="nav-item" data-view="dashboard"><i class="fas fa-code-branch"></i> New Analysis</div>
+      <div class="nav-item" data-view="history"><i class="fas fa-clock-rotate-left"></i> History</div>
+      <div class="nav-item" data-view="progress"><i class="fas fa-chart-line"></i> Progress</div>
+      <div class="nav-item" data-view="stats"><i class="fas fa-chart-simple"></i> Statistics</div>
+      <div class="nav-item" data-view="soon"><i class="fas fa-bookmark"></i> Saved Snippets</div>
+      <div class="nav-item" data-view="soon"><i class="fas fa-gear"></i> Settings</div>
+      <div class="nav-item" data-view="docs"><i class="fas fa-file-lines"></i> API Docs</div>
+    </nav>
+    <div class="user-box">
+      <div class="user-row">
+        <div class="user-avatar">D</div>
+        <div><div class="user-name">Davichik</div><div class="user-role">Student</div></div>
+      </div>
+      <div class="user-tagline">Keep coding, keep growing! 🚀</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="header">
+      <div>
+        <h1>New Code Analysis</h1>
+        <p>Paste your Python code below and get AI-powered feedback</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-new" onclick="clearAll()"><i class="fas fa-plus"></i> New Analysis</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT: CODE + FEEDBACK -->
+      <div>
+        <div class="card">
+          <div class="code-panel-head">
+            <div class="filename"><i class="fab fa-python"></i> <span id="filenameLabel">main.py</span></div>
+            <button class="btn-clear" onclick="clearAll()">Clear</button>
+          </div>
+          <div class="editor">
+            <textarea id="codeInput" spellcheck="false" placeholder="import sqlite3
+
+def get_user(user_id):
+    query = f&quot;SELECT * FROM users WHERE id = {user_id}&quot;
+    ..."></textarea>
+          </div>
+          <div class="editor-actions">
+            <button class="btn-secondary" onclick="document.getElementById('fileUpload').click()">
+              <i class="fas fa-upload"></i> Upload File
+            </button>
+            <input type="file" id="fileUpload" accept=".py,.txt" style="display:none" onchange="handleFileUpload(event)">
+            <button class="btn-secondary" onclick="loadExample('bad')"><i class="fas fa-vial"></i> SQL Injection Example</button>
+            <button class="btn-secondary" onclick="loadExample('loop')"><i class="fas fa-vial"></i> Bad Loop Example</button>
+            <button class="btn-analyze" id="analyzeBtn" onclick="analyzeCode()">
+              <i class="fas fa-wand-magic-sparkles"></i> Analyze Code
+            </button>
+          </div>
+          <div class="hint-note">Supports Python 3.8+ • Max 10k characters</div>
+
+          <div id="statusBanner" class="status-banner"></div>
+
+          <div id="catGrid" class="cat-grid" style="display:none;">
+            <div class="cat-card critical">
+              <div class="cat-title critical"><i class="fas fa-circle-exclamation"></i> Critical (<span id="critCount">0</span>)</div>
+              <div id="critBody"></div>
+            </div>
+            <div class="cat-card improvement">
+              <div class="cat-title improvement"><i class="fas fa-triangle-exclamation"></i> Improvement (<span id="impCount">0</span>)</div>
+              <div id="impBody"></div>
+            </div>
+            <div class="cat-card learning">
+              <div class="cat-title learning"><i class="fas fa-graduation-cap"></i> Learning (<span id="learnCount">0</span>)</div>
+              <div id="learnBody"></div>
+            </div>
+            <div class="cat-card good">
+              <div class="cat-title good"><i class="fas fa-circle-check"></i> Good (<span id="goodCount">0</span>)</div>
+              <div id="goodBody"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROGRESS CHART -->
+        <div class="card progress-card">
+          <div class="progress-head">
+            <span style="font-size:13px;font-weight:600;color:#e2e4e9;">Your Progress</span>
+            <div class="progress-stats">
+              <div><div class="pstat-num" id="avgScore">–</div><div class="pstat-label">Average Score</div></div>
+              <div><div class="pstat-num" id="totalAnalyses">–</div><div class="pstat-label">Analyses</div></div>
+            </div>
+          </div>
+          <svg id="progressChart" viewBox="0 0 600 160" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="right-col">
+        <div class="card score-card">
+          <div class="score-card-head"><span>Overall Score</span><i class="fas fa-circle-info" style="color:#5a6080;font-size:11px;"></i></div>
+          <div class="score-ring-wrap">
+            <svg viewBox="0 0 140 140" width="150" height="150">
+              <circle cx="70" cy="70" r="60" fill="none" stroke="#1c2030" stroke-width="10"/>
+              <circle id="scoreArc" cx="70" cy="70" r="60" fill="none" stroke="#a855f7" stroke-width="10"
+                stroke-linecap="round" stroke-dasharray="0 377" />
+            </svg>
+            <div class="score-center"><div class="num" id="scoreNum">–</div><div class="den">/ 100</div></div>
+          </div>
+          <div class="score-msg" id="scoreMsg">Paste code and click Analyze to see your score</div>
+          <div class="score-breakdown">
+            <div class="sb-item"><div class="sb-num critical" id="sbCrit">0</div><div class="sb-label">Critical</div></div>
+            <div class="sb-item"><div class="sb-num improvement" id="sbImp">0</div><div class="sb-label">Improve</div></div>
+            <div class="sb-item"><div class="sb-num learning" id="sbLearn">0</div><div class="sb-label">Learning</div></div>
+            <div class="sb-item"><div class="sb-num good" id="sbGood">0</div><div class="sb-label">Good</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="mentor-head"><span><i class="fas fa-hat-wizard" style="color:#a78bfa;"></i> Mentor Mode</span>
+            <span class="mentor-step" id="mentorStep">Step 0 of 0</span>
+          </div>
+          <div class="mentor-box">
+            <p id="mentorHintText">Analyze some code to unlock mentor hints — guided questions instead of ready-made answers.</p>
+            <div class="sub" id="mentorHintSub"></div>
+          </div>
+          <div class="mentor-nav">
+            <button id="mentorPrev" onclick="mentorPrev()" disabled><i class="fas fa-arrow-left"></i> Previous</button>
+            <button id="mentorNext" class="primary" onclick="mentorNext()" disabled>Next Hint <i class="fas fa-arrow-right"></i></button>
+          </div>
+          <div class="mentor-footer">💡 Подсказки помогут тебе найти решение самому!</div>
+        </div>
+
+        <div class="card">
+          <div class="recent-head"><span>Recent Analyses</span><a onclick="loadHistory()">Refresh</a></div>
+          <div id="recentList"><div class="empty-note">Loading history…</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'http://localhost:8000';
+let currentFeedback = null;
+let currentHints = [];
+let hintIndex = 0;
+
+/* ---------- Examples & file upload ---------- */
+function loadExample(type) {
+  const examples = {
+    bad: `import sqlite3
+
+def get_user(user_id):
+    query = f"SELECT * FROM users WHERE id = {user_id}"
+    conn = sqlite3.connect("db.sqlite")
+    cursor = conn.cursor()
+    cursor.execute(query)
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+user_input = input("Enter user id: ")
+user = get_user(user_input)
+print(user)`,
+    loop: `data = [1, 2, 3, 4, 5]
+for i in range(len(data)):
+    print(data[i])
+
+result = []
+for item in data:
+    result.append(item * 2)`
+  };
+  document.getElementById('codeInput').value = examples[type];
+  document.getElementById('filenameLabel').textContent = type === 'bad' ? 'get_user.py' : 'loop_example.py';
+}
+
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('filenameLabel').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = (ev) => { document.getElementById('codeInput').value = ev.target.result; };
+  reader.readAsText(file);
+}
+
+function clearAll() {
+  document.getElementById('codeInput').value = '';
+  document.getElementById('filenameLabel').textContent = 'main.py';
+  document.getElementById('catGrid').style.display = 'none';
+  hideBanner();
+  resetScore();
+  resetMentor();
+}
+
+/* ---------- Status banner ---------- */
+function showBanner(msg, type) {
+  const el = document.getElementById('statusBanner');
+  el.textContent = msg;
+  el.className = `status-banner show ${type}`;
+}
+function hideBanner() {
+  document.getElementById('statusBanner').className = 'status-banner';
+}
+
+/* ---------- Analyze ---------- */
+async function analyzeCode() {
+  const code = document.getElementById('codeInput').value.trim();
+  if (!code || code.length < 5) {
+    showBanner('Paste at least a few lines of code first.', 'err');
+    return;
+  }
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+  hideBanner();
+
+  try {
+    const res = await fetch(`${API_URL}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, filename: document.getElementById('filenameLabel').textContent })
+    });
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    const data = await res.json();
+
+    if (data.summary && data.summary.toLowerCase().includes('unavailable')) {
+      showBanner('AI service unavailable — showing fallback response. Check your API key / quota.', 'warn');
+    }
+
+    renderFeedback(data);
+    loadHistory();
+    loadProgress();
+  } catch (err) {
+    showBanner('Cannot connect to backend on localhost:8000. Make sure the server is running.', 'err');
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Analyze Code';
+  }
+}
+
+/* ---------- Render feedback ---------- */
+function renderFeedback(data) {
+  currentFeedback = data.feedback;
+  currentHints = data.mentor_hints || [];
+  hintIndex = 0;
+
+  document.getElementById('catGrid').style.display = 'grid';
+  fillCategory('crit', currentFeedback.critical, i => i.issue, i => i.explanation || i.why);
+  fillCategory('imp', currentFeedback.improvements, i => i.issue, i => i.suggestion || i.explanation);
+  fillCategory('learn', currentFeedback.learning, i => i.topic, i => i.explanation);
+  fillCategory('good', currentFeedback.good, i => i.practice, i => i.explanation);
+
+  updateScore(data.score, currentFeedback);
+  updateMentor();
+}
+
+function fillCategory(prefix, items, titleFn, descFn) {
+  const body = document.getElementById(`${prefix}Body`);
+  const count = document.getElementById(
+    prefix === 'crit' ? 'critCount' : prefix === 'imp' ? 'impCount' : prefix === 'learn' ? 'learnCount' : 'goodCount'
+  );
+  items = items || [];
+  count.textContent = items.length;
+  if (items.length === 0) {
+    body.innerHTML = '<div class="cat-empty">Nothing here — nice!</div>';
+    return;
+  }
+  body.innerHTML = items.map(i => `
+    <div class="cat-item">
+      <h5>${escapeHtml(titleFn(i) || 'Item')}</h5>
+      <p>${escapeHtml(descFn(i) || '')}</p>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ---------- Score ring ---------- */
+function updateScore(score, feedback) {
+  const circumference = 2 * Math.PI * 60;
+  const fillLen = (score / 100) * circumference;
+  const arc = document.getElementById('scoreArc');
+  arc.setAttribute('stroke-dasharray', `${fillLen} ${circumference}`);
+  arc.setAttribute('stroke', score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444');
+
+  document.getElementById('scoreNum').textContent = score;
+  document.getElementById('scoreMsg').textContent = scoreMessage(score);
+
+  document.getElementById('sbCrit').textContent = (feedback.critical || []).length;
+  document.getElementById('sbImp').textContent = (feedback.improvements || []).length;
+  document.getElementById('sbLearn').textContent = (feedback.learning || []).length;
+  document.getElementById('sbGood').textContent = (feedback.good || []).length;
+}
+
+function scoreMessage(score) {
+  if (score >= 90) return "Excellent! This code is production quality.";
+  if (score >= 80) return "Your code is good, but there's room for improvement!";
+  if (score >= 70) return "Fair. A few things worth fixing before shipping.";
+  if (score >= 60) return "Needs work — check the critical items below.";
+  return "Significant issues found. Start with Critical items.";
+}
+
+function resetScore() {
+  document.getElementById('scoreArc').setAttribute('stroke-dasharray', '0 377');
+  document.getElementById('scoreNum').textContent = '–';
+  document.getElementById('scoreMsg').textContent = 'Paste code and click Analyze to see your score';
+  ['sbCrit','sbImp','sbLearn','sbGood'].forEach(id => document.getElementById(id).textContent = '0');
+}
+
+/* ---------- Mentor Mode ---------- */
+function updateMentor() {
+  document.getElementById('mentorStep').textContent = `Step ${currentHints.length ? 1 : 0} of ${currentHints.length}`;
+  renderHint();
+  document.getElementById('mentorPrev').disabled = true;
+  document.getElementById('mentorNext').disabled = currentHints.length <= 1;
+}
+function renderHint() {
+  if (!currentHints.length) {
+    document.getElementById('mentorHintText').textContent = 'No hints for this code — looks clean! Try another example.';
+    document.getElementById('mentorHintSub').textContent = '';
+    return;
+  }
+  const h = currentHints[hintIndex];
+  document.getElementById('mentorHintText').textContent = h.hint;
+  document.getElementById('mentorHintSub').textContent = h.guide || '';
+  document.getElementById('mentorStep').textContent = `Step ${hintIndex + 1} of ${currentHints.length}`;
+}
+function mentorNext() {
+  if (hintIndex < currentHints.length - 1) hintIndex++;
+  renderHint();
+  document.getElementById('mentorPrev').disabled = hintIndex === 0;
+  document.getElementById('mentorNext').disabled = hintIndex === currentHints.length - 1;
+}
+function mentorPrev() {
+  if (hintIndex > 0) hintIndex--;
+  renderHint();
+  document.getElementById('mentorPrev').disabled = hintIndex === 0;
+  document.getElementById('mentorNext').disabled = hintIndex === currentHints.length - 1;
+}
+function resetMentor() {
+  currentHints = []; hintIndex = 0;
+  document.getElementById('mentorStep').textContent = 'Step 0 of 0';
+  document.getElementById('mentorHintText').textContent = 'Analyze some code to unlock mentor hints — guided questions instead of ready-made answers.';
+  document.getElementById('mentorHintSub').textContent = '';
+  document.getElementById('mentorPrev').disabled = true;
+  document.getElementById('mentorNext').disabled = true;
+}
+
+/* ---------- History ---------- */
+async function loadHistory() {
+  const list = document.getElementById('recentList');
+  try {
+    const res = await fetch(`${API_URL}/history?limit=5`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    if (!data.analyses || data.analyses.length === 0) {
+      list.innerHTML = '<div class="empty-note">No analyses yet — run your first one!</div>';
+      return;
+    }
+    list.innerHTML = data.analyses.map(a => `
+      <div class="recent-item">
+        <div class="recent-icon"><i class="fab fa-python"></i></div>
+        <div class="recent-info">
+          <h5>${escapeHtml(a.filename)}</h5>
+          <p>Score: ${a.score}/100 • ${timeAgo(a.timestamp)}</p>
+        </div>
+        <div class="recent-badge ${badgeClass(a.score)}">${badgeLabel(a.score)}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    list.innerHTML = '<div class="empty-note">Backend not reachable</div>';
+  }
+}
+function badgeClass(score) { return score >= 75 ? 'good' : score >= 50 ? 'ok' : 'bad'; }
+function badgeLabel(score) { return score >= 75 ? 'Good' : score >= 50 ? 'Fair' : 'Bad'; }
+function timeAgo(ts) {
+  const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+  if (diff < 3600) return `${Math.max(1, Math.round(diff/60))} min ago`;
+  if (diff < 86400) return `${Math.round(diff/3600)} hours ago`;
+  return `${Math.round(diff/86400)} days ago`;
+}
+
+/* ---------- Progress ---------- */
+async function loadProgress() {
+  try {
+    const [progRes, statsRes] = await Promise.all([
+      fetch(`${API_URL}/progress`),
+      fetch(`${API_URL}/stats`)
+    ]);
+    const prog = await progRes.json();
+    const stats = await statsRes.json();
+
+    document.getElementById('avgScore').textContent = stats.average_score ?? '–';
+    document.getElementById('totalAnalyses').textContent = stats.total_analyses ?? '0';
+
+    drawChart(prog.score_trend || []);
+  } catch (e) {
+    console.warn('Progress unavailable', e);
+  }
+}
+
+function drawChart(scores) {
+  const svg = document.getElementById('progressChart');
+  svg.innerHTML = '';
+  if (!scores.length) {
+    svg.innerHTML = `<text x="300" y="80" fill="#5a6080" font-size="12" text-anchor="middle">No history yet — analyze some code to build your progress chart</text>`;
+    return;
+  }
+  const w = 600, h = 160, pad = 20;
+  const max = 100, min = 0;
+  const stepX = scores.length > 1 ? (w - pad*2) / (scores.length - 1) : 0;
+  const points = scores.map((s, i) => {
+    const x = pad + i * stepX;
+    const y = h - pad - ((s - min) / (max - min)) * (h - pad*2);
+    return [x, y];
+  });
+
+  const linePath = points.map((p,i) => (i===0?'M':'L') + p[0] + ',' + p[1]).join(' ');
+  const areaPath = linePath + ` L${points[points.length-1][0]},${h-pad} L${points[0][0]},${h-pad} Z`;
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#a855f7" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="${areaPath}" fill="url(#areaGrad)" />
+    <path d="${linePath}" fill="none" stroke="#a855f7" stroke-width="2.5" />
+    ${points.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#a855f7" />`).join('')}
+  `;
+}
+
+/* ---------- Nav (single page stubs) ---------- */
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    item.classList.add('active');
+    const view = item.dataset.view;
+    if (view === 'docs') window.open(`${API_URL}/docs`, '_blank');
+    if (view === 'soon') showBanner('This section is planned for a future version.', 'warn');
+  });
+});
+
+/* ---------- Init ---------- */
+window.addEventListener('load', () => {
+  loadHistory();
+  loadProgress();
+});
+</script>
+</body>
+</html>

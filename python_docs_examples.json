@@ -1,0 +1,125 @@
+{
+  "python_best_practices": [
+    {
+      "topic": "List Comprehensions",
+      "description": "More Pythonic way to create lists",
+      "bad": "result = []\nfor i in range(10):\n    result.append(i * 2)",
+      "good": "result = [i * 2 for i in range(10)]",
+      "explanation": "List comprehensions are faster and more readable than loops for simple transformations"
+    },
+    {
+      "topic": "Context Managers",
+      "description": "Proper resource management with 'with' statement",
+      "bad": "f = open('file.txt')\ndata = f.read()\nf.close()",
+      "good": "with open('file.txt') as f:\n    data = f.read()",
+      "explanation": "Context managers ensure files are closed even if errors occur"
+    },
+    {
+      "topic": "Generator Functions",
+      "description": "Memory-efficient iteration",
+      "bad": "def get_numbers(n):\n    result = []\n    for i in range(n):\n        result.append(i)\n    return result",
+      "good": "def get_numbers(n):\n    for i in range(n):\n        yield i",
+      "explanation": "Generators don't store all values in memory, they produce them on demand"
+    },
+    {
+      "topic": "Type Hints",
+      "description": "Static type checking for better code clarity",
+      "bad": "def add(a, b):\n    return a + b",
+      "good": "def add(a: int, b: int) -> int:\n    return a + b",
+      "explanation": "Type hints help IDEs detect errors and make code self-documenting"
+    },
+    {
+      "topic": "Exception Handling",
+      "description": "Proper error handling patterns",
+      "bad": "try:\n    data = risky_operation()\nexcept:\n    pass",
+      "good": "try:\n    data = risky_operation()\nexcept ValueError as e:\n    logger.error(f'Invalid value: {e}')\n    raise",
+      "explanation": "Catch specific exceptions and handle them appropriately, don't silently ignore errors"
+    }
+  ],
+  "performance_tips": [
+    {
+      "topic": "String Concatenation",
+      "issue": "Using += in loops for strings",
+      "slow": "result = ''\nfor item in items:\n    result += str(item)",
+      "fast": "result = ''.join(str(item) for item in items)",
+      "why": "String concatenation creates new objects each time. join() is O(n), += is O(n squared)"
+    },
+    {
+      "topic": "Dictionary Lookups",
+      "issue": "Multiple lookups instead of using get()",
+      "bad": "if key in dict:\n    value = dict[key]\nelse:\n    value = default",
+      "good": "value = dict.get(key, default)",
+      "why": "get() performs one lookup instead of two"
+    },
+    {
+      "topic": "Set vs List",
+      "issue": "Using list for membership checking",
+      "slow": "if item in large_list:\n    pass",
+      "fast": "if item in item_set:\n    pass",
+      "why": "Set lookup is constant time, list lookup is linear"
+    }
+  ],
+  "security_issues": [
+    {
+      "topic": "SQL Injection",
+      "danger": "Directly formatting SQL queries",
+      "vulnerable": "query = f\"SELECT * FROM users WHERE id = {user_id}\"",
+      "safe": "cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))",
+      "why": "Parameterized queries prevent SQL injection attacks"
+    },
+    {
+      "topic": "Hardcoded Secrets",
+      "danger": "Storing API keys in source code",
+      "bad": "API_KEY = 'sk-12345'",
+      "good": "API_KEY = os.getenv('API_KEY')",
+      "why": "Use environment variables to keep secrets out of version control"
+    },
+    {
+      "topic": "Unsafe Deserialization",
+      "danger": "Using pickle for untrusted data",
+      "unsafe": "data = pickle.loads(user_input)",
+      "safe": "data = json.loads(user_input)",
+      "why": "pickle can execute arbitrary code. Use json for untrusted data"
+    }
+  ],
+  "common_mistakes": [
+    {
+      "mistake": "Mutable default arguments",
+      "code": "def func(items=[]):",
+      "problem": "Default list is created once and shared across calls",
+      "solution": "def func(items=None):\n    if items is None:\n        items = []"
+    },
+    {
+      "mistake": "Late binding in loops",
+      "code": "funcs = [lambda x: i*x for i in range(3)]",
+      "problem": "All lambdas reference the same 'i' variable",
+      "solution": "funcs = [lambda x, i=i: i*x for i in range(3)]"
+    },
+    {
+      "mistake": "Not using __name__ == '__main__'",
+      "code": "# Code at module level that runs on import",
+      "problem": "Code runs when module is imported, not just when executed",
+      "solution": "if __name__ == '__main__':\n    main()"
+    }
+  ],
+  "readability_patterns": [
+    {
+      "pattern": "Meaningful Variable Names",
+      "bad": "x = 10\ny = x * 2",
+      "good": "user_count = 10\ntotal_users_needed = user_count * 2",
+      "why": "Code is read more often than written"
+    },
+    {
+      "pattern": "Function Docstrings",
+      "without": "def calculate(a, b):\n    return a + b",
+      "with": "def calculate(a: int, b: int) -> int:\n    \"\"\"Calculate sum of two numbers.\"\"\"\n    return a + b",
+      "why": "Docstrings help users understand function purpose"
+    },
+    {
+      "pattern": "Breaking Long Lines",
+      "long": "result = some_function(arg1, arg2, arg3, arg4, arg5) if condition else alternative",
+      "readable": "if condition:\n    result = some_function(\n        arg1, arg2, arg3, arg4, arg5\n    )\nelse:\n    result = alternative",
+      "why": "Long lines are hard to read and debug"
+    }
+  ]
+}
