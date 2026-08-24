@@ -1,10 +1,5 @@
-<<<<<<< HEAD
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
-=======
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
->>>>>>> 08a1ab1d6e2012d4226cc7912c0b4c6619971c24
 pydantic>=2.12.5
 python-dotenv==1.0.0
 google-genai==2.18.1
