@@ -16,17 +16,37 @@ class Database:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
+            # Users table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    display_name TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
             # Analyses table
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS analyses (
                     id TEXT PRIMARY KEY,
+                    user_id TEXT,
                     filename TEXT NOT NULL,
                     code TEXT NOT NULL,
                     feedback TEXT NOT NULL,
                     score INTEGER NOT NULL,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
                 )
             ''')
+            
+            # Lightweight migration: if analyses table exists from before auth was
+            # added, it won't have user_id yet. Add it if missing (SQLite-safe check).
+            cursor.execute("PRAGMA table_info(analyses)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "user_id" not in columns:
+                cursor.execute("ALTER TABLE analyses ADD COLUMN user_id TEXT")
             
             # Feedback cache for quick lookup
             cursor.execute('''
@@ -48,8 +68,70 @@ class Database:
             print(f"Error initializing database: {e}")
             raise
     
-    def save_analysis(self, code: str, filename: str, feedback: dict, score: int) -> str:
-        """Save code analysis to database"""
+    # ------------------------------------------------------------------
+    # Users
+    # ------------------------------------------------------------------
+    def create_user(self, email: str, password_hash: str, display_name: Optional[str] = None) -> Optional[str]:
+        """Create a new user. Returns the new user's id, or None if email already exists."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            user_id = f"user_{uuid.uuid4().hex[:12]}"
+            try:
+                cursor.execute('''
+                    INSERT INTO users (id, email, password_hash, display_name)
+                    VALUES (?, ?, ?, ?)
+                ''', (user_id, email.lower().strip(), password_hash, display_name))
+                conn.commit()
+                return user_id
+            except sqlite3.IntegrityError:
+                # UNIQUE constraint on email
+                return None
+            finally:
+                conn.close()
+        except Exception as e:
+            print(f"Error creating user: {e}")
+            return None
+    
+    def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """Look up a user by email. Returns dict with id/email/password_hash/display_name, or None."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT * FROM users WHERE email = ?', (email.lower().strip(),))
+            row = cursor.fetchone()
+            conn.close()
+            
+            if row:
+                return dict(row)
+            return None
+        except Exception as e:
+            print(f"Error looking up user: {e}")
+            return None
+    
+    def get_user_by_id(self, user_id: str) -> Optional[Dict]:
+        """Look up a user by id. Returns dict without password_hash, or None."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT id, email, display_name, created_at FROM users WHERE id = ?', (user_id,))
+            row = cursor.fetchone()
+            conn.close()
+            
+            if row:
+                return dict(row)
+            return None
+        except Exception as e:
+            print(f"Error looking up user: {e}")
+            return None
+    
+    def save_analysis(self, code: str, filename: str, feedback: dict, score: int, user_id: Optional[str] = None) -> str:
+        """Save code analysis to database. user_id is optional — anonymous analyses are still supported."""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -59,9 +141,9 @@ class Database:
             timestamp = datetime.now().isoformat()
             
             cursor.execute('''
-                INSERT INTO analyses (id, filename, code, feedback, score, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (analysis_id, filename, code, feedback_json, score, timestamp))
+                INSERT INTO analyses (id, user_id, filename, code, feedback, score, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (analysis_id, user_id, filename, code, feedback_json, score, timestamp))
             
             # Save feedback counts
             critical_count = len(feedback.get("critical", []))
@@ -96,6 +178,7 @@ class Database:
             if row:
                 return {
                     "id": row["id"],
+                    "user_id": row["user_id"],
                     "filename": row["filename"],
                     "code": row["code"],
                     "feedback": json.loads(row["feedback"]),
@@ -107,19 +190,29 @@ class Database:
             print(f"Error getting analysis: {e}")
             return None
     
-    def get_history(self, limit: int = 10) -> List[Dict]:
-        """Get analysis history"""
+    def get_history(self, limit: int = 10, user_id: Optional[str] = None) -> List[Dict]:
+        """Get analysis history. If user_id is given, only that user's analyses are returned;
+        otherwise all analyses (anonymous + everyone's) are returned, as before."""
         try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            cursor.execute('''
-                SELECT id, filename, code, score, timestamp, feedback
-                FROM analyses
-                ORDER BY timestamp DESC
-                LIMIT ?
-            ''', (limit,))
+            if user_id:
+                cursor.execute('''
+                    SELECT id, filename, code, score, timestamp, feedback
+                    FROM analyses
+                    WHERE user_id = ?
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                ''', (user_id, limit))
+            else:
+                cursor.execute('''
+                    SELECT id, filename, code, score, timestamp, feedback
+                    FROM analyses
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                ''', (limit,))
             
             rows = cursor.fetchall()
             conn.close()
