@@ -89,3 +89,27 @@ class StatsResponse(BaseModel):
     average_score: float
     best_score: int
     categories: dict
+
+class UserRegister(BaseModel):
+    """Registration request"""
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., min_length=8, description="Password, minimum 8 characters")
+    display_name: Optional[str] = Field(default=None, description="Optional display name")
+
+class UserLogin(BaseModel):
+    """Login request"""
+    email: str
+    password: str
+
+class UserResponse(BaseModel):
+    """Public user info (never includes password)"""
+    id: str
+    email: str
+    display_name: Optional[str] = None
+    created_at: str
+
+class TokenResponse(BaseModel):
+    """Response after successful register/login"""
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
