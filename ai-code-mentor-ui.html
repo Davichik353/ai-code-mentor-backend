@@ -385,6 +385,37 @@
             color: #5a6170;
         }
 
+        .auth-overlay {
+            position: fixed; inset: 0; z-index: 10; display: flex; align-items: center;
+            justify-content: center; background: rgba(15, 20, 25, 0.96);
+        }
+        .auth-box { width: min(420px, 92vw); background: #1a1f2e; border: 1px solid #2a3347;
+            border-radius: 14px; padding: 28px; }
+        .auth-box h2 { color: white; margin-bottom: 8px; }
+        .auth-box p { color: #8b8f9e; font-size: 13px; margin-bottom: 18px; }
+        .auth-box input, .language-select { width: 100%; padding: 11px; margin-bottom: 10px;
+            border-radius: 8px; border: 1px solid #2a3347; background: #252d3d; color: white; }
+        .auth-switch { color: #a5b4fc; cursor: pointer; text-align: center; margin-top: 14px; font-size: 12px; }
+        .file-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+        .file-row input { flex: 1; color: #8b8f9e; font-size: 12px; }
+        .user-bar { margin-top: auto; border-top: 1px solid #2a3347; padding-top: 14px; font-size: 12px; color: #8b8f9e; }
+        .video-link { display: block; color: #a5b4fc; margin-top: 10px; font-size: 12px; }
+        .investor-panel {
+            position: fixed; inset: 0; z-index: 9; display: none; overflow-y: auto;
+            background: rgba(15, 20, 25, 0.98); padding: 36px;
+        }
+        .investor-inner { max-width: 1040px; margin: 0 auto; }
+        .investor-hero { padding: 28px; border-radius: 14px; background: linear-gradient(135deg, #252d3d, #31245a); margin-bottom: 20px; }
+        .investor-hero h2 { color: white; font-size: 28px; margin-bottom: 10px; }
+        .investor-hero p { color: #d5d8e7; line-height: 1.6; max-width: 760px; }
+        .investor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+        .investor-stat { background: #1a1f2e; border: 1px solid #2a3347; border-radius: 10px; padding: 18px; }
+        .investor-stat strong { display: block; color: #a5b4fc; font-size: 22px; margin-bottom: 6px; }
+        .investor-stat span { color: #8b8f9e; font-size: 12px; }
+        .investor-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .investor-list { color: #c4c4c4; line-height: 1.8; padding-left: 18px; font-size: 13px; }
+        @media (max-width: 768px) { .investor-panel { padding: 20px; } .investor-grid, .investor-columns { grid-template-columns: 1fr; } }
+
         .empty-icon {
             font-size: 48px;
             margin-bottom: 16px;
@@ -429,40 +460,60 @@
             </div>
 
             <nav class="nav-items">
-                <div class="nav-item active">
+                <div class="nav-item active" onclick="showDashboard()">
                     <i class="fas fa-chart-line"></i> Dashboard
                 </div>
-                <div class="nav-item">
+                <div class="nav-item" onclick="loadHistory()">
                     <i class="fas fa-history"></i> History
                 </div>
-                <div class="nav-item">
+                <div class="nav-item" onclick="showSettings()">
                     <i class="fas fa-cog"></i> Settings
                 </div>
+                <div class="nav-item" onclick="showInvestorDemo()">
+                    <i class="fas fa-rocket"></i> Investor Demo
+                </div>
             </nav>
+            <div class="user-bar"><span id="userEmail">Not signed in</span><br>
+                <button class="btn-secondary" style="margin-top:8px;width:100%;" onclick="logout()">Sign out</button>
+            </div>
         </div>
 
         <!-- Main Content -->
         <div class="main">
             <div class="header">
                 <h1>Code Analysis</h1>
-                <p style="color: #8b8f9e; margin-top: 4px; font-size: 13px;">Paste your Python code and get AI-powered feedback</p>
+                <p style="color: #8b8f9e; margin-top: 4px; font-size: 13px;">Analyze code in any language and learn how to fix errors</p>
             </div>
 
             <div class="content">
                 <!-- Code Input -->
                 <div class="card">
                     <div class="code-editor">
-                        <label class="editor-label">📝 Paste your Python code:</label>
+                        <label class="editor-label">📝 Paste code or upload any file:</label>
+                        <select id="languageSelect" class="language-select">
+                            <option value="">Auto-detect language</option>
+                            <option>Python</option><option>JavaScript</option><option>TypeScript</option>
+                            <option>Java</option><option>C++</option><option>C#</option><option>Go</option>
+                            <option>Rust</option><option>PHP</option><option>Ruby</option><option>SQL</option>
+                            <option>HTML</option><option>CSS</option><option>Other</option>
+                        </select>
                         <textarea id="codeInput" placeholder="def hello():
     print('Hello World')
 
 # Add your code here..."></textarea>
+                        <div class="file-row">
+                            <input id="fileInput" type="file" onchange="loadFile(event)">
+                            <span id="fileName" style="font-size:11px;color:#8b8f9e;">No file selected</span>
+                        </div>
                         <div class="button-group">
                             <button class="btn-primary" onclick="analyzeCode()">
                                 <i class="fas fa-play"></i> Analyze
                             </button>
                             <button class="btn-secondary" onclick="clearCode()">
                                 <i class="fas fa-trash"></i> Clear
+                            </button>
+                            <button class="btn-secondary" onclick="findTextErrors()">
+                                <i class="fas fa-search"></i> Find errors
                             </button>
                         </div>
                     </div>
@@ -493,8 +544,152 @@
         </div>
     </div>
 
+    <section id="investorPanel" class="investor-panel">
+        <div class="investor-inner">
+            <button class="btn-secondary" style="max-width:160px;margin-bottom:20px;" onclick="closeInvestorDemo()">
+                <i class="fas fa-arrow-left"></i> Back to app
+            </button>
+            <div class="investor-hero">
+                <h2>AI Code Mentor</h2>
+                <p>Интерактивный AI-наставник, который помогает разработчику быстро найти ошибку, понять причину и изучить решение через релевантные материалы.</p>
+            </div>
+            <div class="investor-grid">
+                <div class="investor-stat"><strong>Any language</strong><span>Поддержка популярных языков программирования</span></div>
+                <div class="investor-stat"><strong>3 шага</strong><span>Ошибка → объяснение → следующий шаг обучения</span></div>
+                <div class="investor-stat"><strong>24/7</strong><span>Самообслуживание без ожидания ментора</span></div>
+            </div>
+            <div class="investor-columns">
+                <div class="card">
+                    <h3 class="card-title">Проблема</h3>
+                    <ul class="investor-list">
+                        <li>Новички видят ошибку, но не понимают её причину.</li>
+                        <li>Поиск решения занимает много времени.</li>
+                        <li>Обычные AI-ответы часто дают готовый код вместо обучения.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Решение</h3>
+                    <ul class="investor-list">
+                        <li>Анализирует код и находит критические проблемы.</li>
+                        <li>Объясняет «почему», а не только «что исправить».</li>
+                        <li>Даёт progressive hints и ссылки на YouTube-обучение.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Бизнес-модель</h3>
+                    <ul class="investor-list">
+                        <li>Freemium для начинающих разработчиков.</li>
+                        <li>Pro-подписка для расширенных анализов и истории.</li>
+                        <li>B2B-лицензии для учебных центров и команд.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3 class="card-title">Следующий этап</h3>
+                    <ul class="investor-list">
+                        <li>Собрать первые интервью и retention-метрики.</li>
+                        <li>Добавить командные кабинеты и отчёты прогресса.</li>
+                        <li>Интегрировать GitHub/GitLab и IDE-плагин.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="button-group" style="max-width:420px;margin:22px auto 0;">
+                <button class="btn-primary" onclick="startInvestorDemo()">Запустить live-demo</button>
+                <button class="btn-secondary" onclick="window.print()">Печать pitch</button>
+            </div>
+        </div>
+    </section>
+
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-box">
+            <h2 id="authTitle">Create your account</h2>
+            <p id="authSubtitle">Registration is required before using the mentor.</p>
+            <input id="authName" placeholder="Display name (optional)">
+            <input id="authEmail" type="email" placeholder="Email">
+            <input id="authPassword" type="password" placeholder="Password (10+ chars, upper/lower/number/symbol)">
+            <input id="authCode" inputmode="numeric" maxlength="6" placeholder="Email verification code" style="display:none">
+            <button class="btn-primary" style="width:100%;" onclick="submitAuth()" id="authSubmit">Register</button>
+            <div class="auth-switch" onclick="toggleAuthMode()" id="authSwitch">Already have an account? Sign in</div>
+            <div id="authError" class="error-message" style="display:none;margin-top:12px;"></div>
+        </div>
+    </div>
+
     <script>
         const API_URL = 'https://ai-code-mentor-backend-z80q.onrender.com';
+        let authMode = 'register';
+        let selectedFilename = 'analysis.txt';
+
+        function authHeaders() {
+            const token = localStorage.getItem('mentor_token');
+            return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+
+        function toggleAuthMode() {
+            authMode = authMode === 'register' ? 'login' : 'register';
+            document.getElementById('authTitle').textContent = authMode === 'register' ? 'Create your account' : 'Welcome back';
+            document.getElementById('authSubmit').textContent = authMode === 'register' ? 'Register' : 'Sign in';
+            document.getElementById('authName').style.display = authMode === 'register' ? 'block' : 'none';
+            document.getElementById('authSwitch').textContent = authMode === 'register'
+                ? 'Already have an account? Sign in' : 'No account yet? Register';
+        }
+
+        async function submitAuth() {
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPassword').value;
+            const error = document.getElementById('authError');
+            if (!email || password.length < 10) { error.textContent = 'Enter a valid email and a strong password.'; error.style.display = 'block'; return; }
+            try {
+                const body = { email, password };
+                if (authMode === 'register') body.display_name = document.getElementById('authName').value.trim() || null;
+                const response = await fetch(`${API_URL}/auth/${authMode}`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Authentication failed');
+                if (authMode === 'register') {
+                    document.getElementById('authCode').style.display = 'block';
+                    document.getElementById('authSubmit').textContent = 'Verify email';
+                    document.getElementById('authSubmit').onclick = verifyEmail;
+                    error.textContent = 'Verification code sent. Enter the 6-digit code from your email.';
+                    error.style.display = 'block';
+                } else {
+                    localStorage.setItem('mentor_token', data.access_token);
+                    document.getElementById('authOverlay').style.display = 'none';
+                    document.getElementById('userEmail').textContent = data.user.display_name || data.user.email;
+                }
+            } catch (e) { error.textContent = e.message; error.style.display = 'block'; }
+        }
+
+        async function verifyEmail() {
+            const email = encodeURIComponent(document.getElementById('authEmail').value);
+            const code = encodeURIComponent(document.getElementById('authCode').value);
+            const response = await fetch(`${API_URL}/auth/verify-email?email=${email}&code=${code}`, { method: 'POST' });
+            const data = await response.json();
+            if (!response.ok) { document.getElementById('authError').textContent = data.detail || 'Verification failed'; return; }
+            localStorage.setItem('mentor_token', data.access_token);
+            document.getElementById('authOverlay').style.display = 'none';
+            document.getElementById('userEmail').textContent = data.user.display_name || data.user.email;
+        }
+
+        function logout() { localStorage.removeItem('mentor_token'); location.reload(); }
+
+        async function loadFile(event) {
+            const file = event.target.files[0]; if (!file) return;
+            selectedFilename = file.name; document.getElementById('fileName').textContent = file.name;
+            try { document.getElementById('codeInput').value = await file.text(); }
+            catch (e) { showError('This file cannot be read as text. Binary files are accepted, but upload a text source file for analysis.'); }
+        }
+
+        function findTextErrors() {
+            const code = document.getElementById('codeInput').value;
+            if (!code.trim()) { showError('Paste text or upload a file first.'); return; }
+            const lines = code.split('\n'), issues = [];
+            lines.forEach((line, i) => { if (line.length > 120) issues.push(`Line ${i + 1}: more than 120 characters`); });
+            const brackets = {'(':')','[':']','{':'}'}, stack = [];
+            for (const char of code) { if (brackets[char]) stack.push(brackets[char]); else if (Object.values(brackets).includes(char) && stack.pop() !== char) issues.push('Unbalanced brackets or braces'); }
+            if (stack.length) issues.push('Some brackets or braces are not closed');
+            if (!issues.length) showError('Quick text check found no obvious formatting or bracket errors. Run Analyze for a full language-aware review.');
+            else document.getElementById('resultsContainer').innerHTML = `<div class="error-message"><strong>Quick check:</strong><br>${issues.map(escapeHtml).join('<br>')}</div>`;
+        }
+
+        function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
         // Load example codes
         function loadExample1() {
@@ -546,12 +741,11 @@ def get_user(user_id):
             try {
                 const response = await fetch(`${API_URL}/analyze`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json', ...authHeaders() },
                     body: JSON.stringify({
                         code: code,
-                        filename: 'analysis.py'
+                        filename: selectedFilename,
+                        language: document.getElementById('languageSelect').value || null
                     })
                 });
 
@@ -563,7 +757,7 @@ def get_user(user_id):
                 displayResults(data);
 
             } catch (error) {
-                showError('Cannot connect to server. Make sure backend is running on localhost:8000');
+                showError(error.message.includes('401') ? 'Please sign in again.' : 'Cannot connect to the analysis server.');
                 console.error('Error:', error);
             }
         }
@@ -651,6 +845,8 @@ def get_user(user_id):
             let description = item.explanation || item.why || '';
             let suggestion = item.suggestion || item.fix || item.resource || '';
 
+            const topic = title || description;
+            const videoLink = topic ? `<a class="video-link" target="_blank" rel="noopener" href="https://www.youtube.com/results?search_query=${encodeURIComponent(topic + ' programming error tutorial')}"><i class="fab fa-youtube"></i> Find a YouTube explanation</a>` : '';
             return `
                 <div class="result-card ${type}">
                     <div class="result-header">
@@ -659,8 +855,44 @@ def get_user(user_id):
                     <h4 class="result-title">${title}</h4>
                     ${description ? `<p class="result-text">${description}</p>` : ''}
                     ${suggestion ? `<p class="result-text" style="margin-top: 8px; color: #a5b4fc;"><strong>→ ${suggestion}</strong></p>` : ''}
+                    ${videoLink}
                 </div>
             `;
+        }
+
+        async function loadHistory() {
+            const response = await fetch(`${API_URL}/history`, { headers: authHeaders() });
+            const data = await response.json();
+            document.getElementById('resultsContainer').innerHTML = (data.analyses || []).map(item =>
+                `<div class="result-card good"><h4 class="result-title">${escapeHtml(item.filename)} — ${item.score}/100</h4><p class="result-text">${escapeHtml(item.feedback_summary)}</p></div>`
+            ).join('') || '<div class="empty-state">No analyses yet.</div>';
+        }
+
+        function showDashboard() { location.reload(); }
+        function showSettings() {
+            document.getElementById('resultsContainer').innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div><p>Settings are saved automatically in this browser. Use Sign out to switch accounts.</p></div>';
+        }
+
+        function showInvestorDemo() {
+            document.getElementById('investorPanel').style.display = 'block';
+        }
+
+        function closeInvestorDemo() {
+            document.getElementById('investorPanel').style.display = 'none';
+        }
+
+        function startInvestorDemo() {
+            closeInvestorDemo();
+            document.getElementById('languageSelect').value = 'Python';
+            selectedFilename = 'investor-demo.py';
+            document.getElementById('fileName').textContent = selectedFilename;
+            document.getElementById('codeInput').value = `import sqlite3
+
+def find_user(user_id):
+    query = f"SELECT * FROM users WHERE id = {user_id}"
+    connection = sqlite3.connect("app.db")
+    return connection.execute(query).fetchone()`;
+            analyzeCode();
         }
 
         function getScoreFeedback(score) {
@@ -673,6 +905,17 @@ def get_user(user_id):
 
         // Test connection on load
         window.addEventListener('load', async () => {
+            const token = localStorage.getItem('mentor_token');
+            if (token) {
+                try {
+                    const me = await fetch(`${API_URL}/auth/me`, { headers: authHeaders() });
+                    if (me.ok) {
+                        const data = await me.json();
+                        document.getElementById('authOverlay').style.display = 'none';
+                        document.getElementById('userEmail').textContent = data.display_name || data.email;
+                    } else localStorage.removeItem('mentor_token');
+                } catch (e) { console.warn('Authentication check failed', e); }
+            }
             try {
                 const response = await fetch(`${API_URL}/`);
                 if (!response.ok) {

@@ -4,3 +4,4 @@ pydantic>=2.12.5
 python-dotenv==1.0.0
 google-genai==2.18.1
 requests==2.31.0
+PyJWT>=2.8.0
