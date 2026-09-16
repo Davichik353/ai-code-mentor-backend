@@ -13,6 +13,7 @@ import hmac
 import os
 import secrets
 import time
+import re
 from typing import Optional
 
 import jwt
@@ -72,4 +73,21 @@ def decode_access_token(token: str) -> Optional[dict]:
 
 def is_valid_email(email: str) -> bool:
     """Very small sanity check — not full RFC validation, just catches obvious junk."""
-    return "@" in email and "." in email.split("@")[-1] and len(email) <= 254
+    return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email)) and len(email) <= 254
+
+DISPOSABLE_EMAIL_DOMAINS = {
+    "10minutemail.com", "guerrillamail.com", "mailinator.com",
+    "tempmail.com", "temp-mail.org", "yopmail.com", "trashmail.com",
+}
+
+def is_disposable_email(email: str) -> bool:
+    return email.rsplit("@", 1)[-1].lower() in DISPOSABLE_EMAIL_DOMAINS
+
+def is_strong_password(password: str) -> bool:
+    return (
+        len(password) >= 10
+        and bool(re.search(r"[A-Z]", password))
+        and bool(re.search(r"[a-z]", password))
+        and bool(re.search(r"\d", password))
+        and bool(re.search(r"[^A-Za-z0-9]", password))
+    )

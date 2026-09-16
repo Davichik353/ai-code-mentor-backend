@@ -23,6 +23,7 @@ class CodeAnalysisRequest(BaseModel):
     """Request model for code analysis"""
     code: str = Field(..., min_length=5, max_length=10000, description="Python code to analyze")
     filename: Optional[str] = Field(default="code.py", description="Original filename")
+    language: Optional[str] = Field(default=None, description="Programming language (auto-detected when omitted)")
     
     class Config:
         json_schema_extra = {
@@ -113,3 +114,28 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+class RegistrationResponse(BaseModel):
+    message: str
+    email: str
+    verification_required: bool = True
+
+class TodoCreate(BaseModel):
+    """Request model for creating a todo item."""
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=2000)
+
+class TodoUpdate(BaseModel):
+    """Request model for updating a todo item."""
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    completed: Optional[bool] = None
+
+class TodoItem(BaseModel):
+    """Todo item returned by the API."""
+    id: str
+    title: str
+    description: Optional[str] = None
+    completed: bool
+    created_at: str
+    updated_at: str

@@ -58,7 +58,7 @@ class CodeAnalyzer:
             print(f"[claude_analyzer] {self._init_error}")
             return None
 
-    async def analyze(self, code: str, filename: str = "code.py") -> dict:
+    async def analyze(self, code: str, filename: str = "code.py", language: str = "auto") -> dict:
         """
         Analyze code with 4-level feedback system.
         Returns: dict with critical, improvements, learning, and good feedback
@@ -68,7 +68,7 @@ class CodeAnalyzer:
             print(f"[claude_analyzer] Using fallback feedback: {self._init_error}")
             return self._create_default_feedback(code)
 
-        system_prompt = """You are an expert Python code mentor for students. Analyze code and provide structured feedback.
+        system_prompt = """You are an expert programming mentor. Analyze code in any programming language and provide structured feedback.
 
 Return ONLY valid JSON (no markdown, no code blocks, no backticks) with this exact structure:
 {
@@ -95,9 +95,9 @@ Guidelines:
 
 Be encouraging but honest. Explain WHY, not just WHAT."""
 
-        user_prompt = f"""Analyze this Python code ({filename}):
+        user_prompt = f"""Analyze this {language} code ({filename}):
 
-```python
+```
 {code}
 ```
 
@@ -130,12 +130,12 @@ Provide detailed, structured feedback. Remember: respond with ONLY the JSON obje
                 response_text = (response.text or "").strip()
                 if response_text:
                     self.model_name = name
-                    print(f"[claude_analyzer] ✅ {name} responded in time")
+                    print(f"[claude_analyzer] {name} responded in time")
                     break
                 else:
                     print(f"[claude_analyzer] {name} returned empty response, trying next...")
             except Exception as e:
-                print(f"[claude_analyzer] ❌ {name} failed: {e}")
+                print(f"[claude_analyzer] {name} failed: {e}")
                 last_error = e
                 continue
 
