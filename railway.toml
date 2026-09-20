@@ -1,0 +1,46 @@
+# Railway.com deployment configuration for AI Code Mentor
+
+[build]
+# Build command to install Python dependencies
+builder = "nixpacks"
+
+[build.nixpacks]
+# Specify Python 3.11 runtime
+python_version = "3.11"
+
+[deploy]
+# Start command using uvicorn with Railway's PORT environment variable
+startCommand = "python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
+
+# Health check configuration for deployment monitoring
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+
+# Deployment strategy
+restartPolicyType = "always"
+
+[variables]
+# Environment variables required by the application
+
+# JWT secret for token signing (set this in Railway dashboard)
+JWT_SECRET = "${{ secrets.JWT_SECRET }}"
+
+# Google Generative AI API key (set this in Railway dashboard)
+GOOGLE_API_KEY = "${{ secrets.GOOGLE_API_KEY }}"
+
+# Email verification settings (optional - set to "false" for demo mode)
+REQUIRE_EMAIL_VERIFICATION = "false"
+
+# SMTP Configuration (optional - only needed for email verification)
+# SMTP_HOST = "${{ secrets.SMTP_HOST }}"
+# SMTP_PORT = "${{ secrets.SMTP_PORT }}"
+# SMTP_USER = "${{ secrets.SMTP_USER }}"
+# SMTP_PASSWORD = "${{ secrets.SMTP_PASSWORD }}"
+# SMTP_FROM = "${{ secrets.SMTP_FROM }}"
+
+# Database URL (Railway PostgreSQL if using)
+# DATABASE_URL = "${{ secrets.DATABASE_URL }}"
+
+[volumes]
+# Optional: if you need persistent storage for database files
+# /app/data = "data"

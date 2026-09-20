@@ -1,12 +1,23 @@
-from google import genai
-from google.genai import types as genai_types
+try:
+    from google import genai
+    from google.genai import types as genai_types
+except ImportError:
+    # Fallback if google-genai not installed
+    genai = None
+    genai_types = None
 import json
 import os
 import re
+from pathlib import Path
 from typing import Optional
+
+from dotenv import load_dotenv
 
 from rag_engine import RAGEngine
 from mentor_hints import MentorMode
+
+_ENV_FILE = Path(__file__).resolve().parent / ".env"
+load_dotenv(_ENV_FILE)
 
 class CodeAnalyzer:
     """
@@ -31,6 +42,8 @@ class CodeAnalyzer:
             "gemini-3.6-flash",
             "gemini-3.5-flash",
             "gemini-3.5-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
             "gemini-flash-latest",
             "gemini-pro-latest",
         ]
@@ -45,8 +58,9 @@ class CodeAnalyzer:
         if self.client is not None:
             return self.client
 
-        api_key = os.getenv("GOOGLE_API_KEY")
-        if not api_key:
+        load_dotenv(_ENV_FILE)
+        api_key = (os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
+        if not api_key or api_key in {"your-google-api-key", "changeme"}:
             self._init_error = "GOOGLE_API_KEY is not set in .env"
             return None
 

@@ -109,6 +109,9 @@ class UserResponse(BaseModel):
     display_name: Optional[str] = None
     created_at: str
 
+    class Config:
+        extra = "ignore"
+
 class TokenResponse(BaseModel):
     """Response after successful register/login"""
     access_token: str
@@ -119,6 +122,9 @@ class RegistrationResponse(BaseModel):
     message: str
     email: str
     verification_required: bool = True
+    access_token: Optional[str] = None
+    token_type: str = "bearer"
+    user: Optional[UserResponse] = None
 
 class TodoCreate(BaseModel):
     """Request model for creating a todo item."""

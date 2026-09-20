@@ -1,11 +1,14 @@
 from fastapi import FastAPI, HTTPException, Query, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 import json
 import os
 from dotenv import load_dotenv
+import time
 
 from models import (
     CodeAnalysisRequest, CodeAnalysisResponse, AnalysisItem, FeedbackItem,
@@ -18,19 +21,28 @@ from auth import (
     create_access_token, decode_access_token, hash_password, is_valid_email,
     verify_password, is_disposable_email, is_strong_password
 )
+from cache import get_cache, CacheKey
+from performance import get_rate_limiter, get_metrics
+from migrations import run_migrations
+from health import get_health_checker
 import hashlib
 import secrets
 import smtplib
 from datetime import timedelta
 from email.message import EmailMessage
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # Initialize database and analyzer
 db = Database()
 analyzer = CodeAnalyzer()
-security = HTTPBearer(auto_error=False)
+security = HTTPBearer(auto_error=True)
 registration_attempts = {}
+
+# Initialize performance optimization components
+cache = get_cache()
+rate_limiter = get_rate_limiter()
+metrics = get_metrics()
 LANGUAGE_BY_EXTENSION = {
     ".py": "Python", ".js": "JavaScript", ".jsx": "JavaScript/JSX", ".ts": "TypeScript",
     ".tsx": "TypeScript/TSX", ".java": "Java", ".c": "C", ".h": "C", ".cpp": "C++",
@@ -51,6 +63,16 @@ def current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
 def detect_language(filename: str) -> str:
     return LANGUAGE_BY_EXTENSION.get(os.path.splitext(filename or "")[1].lower(), "source code")
+
+def smtp_configured() -> bool:
+    required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"]
+    return all(os.getenv(key) for key in required)
+
+def require_email_verification() -> bool:
+    flag = os.getenv("REQUIRE_EMAIL_VERIFICATION")
+    if flag is not None and flag.strip() != "":
+        return flag.strip().lower() in {"1", "true", "yes", "on"}
+    return smtp_configured()
 
 def send_verification_email(email: str, token: str):
     required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"]
@@ -73,9 +95,31 @@ def send_verification_email(email: str, token: str):
 async def lifespan(app: FastAPI):
     """Initialize database on startup (modern replacement for on_event)"""
     db.init_db()
+
+    # Run database migrations for optimization
+    print("[startup] Running database optimizations...")
+    run_migrations()
+
+    # Clean up old cache entries and metrics
+    print("[startup] Starting cache and metrics cleanup...")
+    cache.cleanup_expired()
+    metrics.cleanup_old_metrics(hours=24)
+
     if not os.getenv("GOOGLE_API_KEY"):
         print("[main] WARNING: GOOGLE_API_KEY is not set — /analyze will use fallback feedback only")
+    if not os.getenv("JWT_SECRET"):
+        print("[main] WARNING: JWT_SECRET is not set — logins will be invalidated on every restart")
+    if not require_email_verification():
+        print("[main] Email verification is OFF (demo mode). Set REQUIRE_EMAIL_VERIFICATION=true after SMTP works.")
+
+    print("[startup] Performance optimizations initialized")
+    print(f"[startup] Cache stats: {cache.stats()}")
     yield
+
+    # Cleanup on shutdown
+    print("[shutdown] Saving cache and metrics statistics...")
+    print(f"[shutdown] Final cache stats: {cache.stats()}")
+    print(f"[shutdown] Metrics tracked {len(metrics._metrics)} endpoints")
 
 app = FastAPI(
     title="AI Code Mentor",
@@ -87,20 +131,64 @@ app = FastAPI(
 # Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8000", "http://127.0.0.1:8000", "https://ai-code-mentor-backend-z80q.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+UI_FILE = Path(__file__).with_name("ai-code-mentor-ui.html")
+
 @app.get("/")
-async def root():
-    """Health check endpoint"""
+async def root(request: Request):
+    accept = request.headers.get("accept", "")
+    if UI_FILE.exists() and "text/html" in accept:
+        return FileResponse(UI_FILE)
     return {
         "message": "AI Code Mentor API",
         "version": "1.0.0",
-        "status": "running"
+        "status": "running",
+        "ui": "/app"
     }
+
+@app.get("/health")
+async def health_check():
+    """
+    Comprehensive health check endpoint for deployment monitoring.
+    Returns detailed status for orchestration, load balancers, and monitoring.
+
+    Checks: database connectivity/response-time, memory, CPU, disk, uptime
+    Status codes: 200=healthy, 503=degraded/down
+    """
+    health_checker = get_health_checker(db.db_path)
+    health_data = health_checker.get_health_status()
+    status_code = 200 if health_data["status"] == "healthy" else 503
+    return health_data
+
+
+@app.get("/metrics")
+async def metrics_endpoint():
+    """
+    Prometheus-compatible metrics endpoint for monitoring systems.
+
+    Provides metrics on:
+    - Service health status (0=down, 1=degraded, 2=healthy)
+    - Database response time and connectivity
+    - Process memory and CPU usage
+    - Disk space utilization
+    - Service uptime
+
+    Usage: Configure Prometheus scrape target -> http://[host]/metrics
+    """
+    health_checker = get_health_checker(db.db_path)
+    metrics_text = health_checker.get_prometheus_metrics()
+    return metrics_text
+
+@app.get("/app")
+async def app_ui():
+    if not UI_FILE.exists():
+        raise HTTPException(status_code=404, detail="UI file is missing")
+    return FileResponse(UI_FILE)
 
 @app.post("/auth/register", response_model=RegistrationResponse, status_code=201)
 async def register(user: UserRegister, request: Request):
@@ -117,12 +205,25 @@ async def register(user: UserRegister, request: Request):
     if len(recent) >= 5:
         raise HTTPException(status_code=429, detail="Too many registration attempts. Try again later.")
     registration_attempts[client_ip] = recent + [now]
+    verify = require_email_verification()
     token = str(secrets.randbelow(900000) + 100000)
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
-    expires = (datetime.now() + timedelta(minutes=30)).isoformat()
-    user_id = db.create_user(email, hash_password(user.password), user.display_name, token_hash, expires)
+    token_hash = hashlib.sha256(token.encode()).hexdigest() if verify else None
+    expires = (datetime.now() + timedelta(minutes=30)).isoformat() if verify else None
+    user_id = db.create_user(
+        email, hash_password(user.password), user.display_name, token_hash, expires,
+        email_verified=0 if verify else 1
+    )
     if not user_id:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
+    if not verify:
+        public_user = db.get_user_by_id(user_id)
+        return RegistrationResponse(
+            message="Account created. You can start analyzing code.",
+            email=email,
+            verification_required=False,
+            access_token=create_access_token(user_id, email),
+            user=UserResponse(**public_user),
+        )
     try:
         send_verification_email(email, token)
     except Exception:
@@ -144,7 +245,7 @@ async def login(user: UserLogin):
     record = db.get_user_by_email(user.email)
     if not record or not verify_password(user.password, record["password_hash"]):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
-    if not record["email_verified"]:
+    if record["email_verified"] == 0 and require_email_verification():
         raise HTTPException(status_code=403, detail="Verify your email before signing in")
     public_user = db.get_user_by_id(record["id"])
     return TokenResponse(access_token=create_access_token(record["id"], record["email"]), user=UserResponse(**public_user))
@@ -228,39 +329,67 @@ async def learning_videos(query: str = Query(..., min_length=2, max_length=200),
     }
 
 @app.get("/analysis/{analysis_id}")
-async def get_analysis(analysis_id: str):
+async def get_analysis(analysis_id: str, user=Depends(current_user)):
     """
     Get specific analysis by ID
     """
     try:
-        analysis = db.get_analysis(analysis_id)
+        analysis = db.get_analysis(analysis_id, user_id=user["id"])
         if not analysis:
             raise HTTPException(status_code=404, detail="Analysis not found")
         return analysis
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/progress")
-async def get_progress():
+async def get_progress(request: Request):
     """
-    Get progress statistics
+    Get progress statistics with caching and rate limiting.
+    Cached for 60 seconds to reduce database load.
     """
+    start_time = time.time()
+
+    # Rate limiting
+    client_ip = request.client.host if request.client else "unknown"
+    allowed, rate_info = rate_limiter.is_allowed(client_ip)
+    if not allowed:
+        metrics.record("progress", "GET", (time.time() - start_time) * 1000, 429)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Try again in {rate_info['retry_after']} seconds."
+        )
+
+    # Check cache
+    cached_stats = cache.get(CacheKey.progress_stats())
+    if cached_stats is not None:
+        metrics.record("progress", "GET", (time.time() - start_time) * 1000, 200)
+        return cached_stats
+
+    # Generate stats
     try:
         stats = db.get_progress_stats()
+        # Cache for 60 seconds
+        cache.set(CacheKey.progress_stats(), stats, ttl_seconds=60)
+        metrics.record("progress", "GET", (time.time() - start_time) * 1000, 200)
         return stats
     except Exception as e:
+        metrics.record("progress", "GET", (time.time() - start_time) * 1000, 500)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/analysis/{analysis_id}")
-async def delete_analysis(analysis_id: str):
+async def delete_analysis(analysis_id: str, user=Depends(current_user)):
     """
     Delete analysis from history
     """
     try:
-        success = db.delete_analysis(analysis_id)
+        success = db.delete_analysis(analysis_id, user_id=user["id"])
         if not success:
             raise HTTPException(status_code=404, detail="Analysis not found")
         return {"message": "Analysis deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -275,16 +404,16 @@ async def get_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/todos", response_model=list[TodoItem])
-async def get_todos(status: str = Query(default="all", pattern="^(all|active|completed)$")):
+@app.get("/todos", response_model=list[TodoItem], dependencies=[Depends(current_user)])
+async def get_todos(status: str = Query(default="all", pattern="^(all|active|completed)$"), user=Depends(current_user)):
     """Get the todo list, optionally filtered by completion status."""
     try:
         return db.get_todos(None if status == "all" else status)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/todos", response_model=TodoItem, status_code=201)
-async def create_todo(todo: TodoCreate):
+@app.post("/todos", response_model=TodoItem, status_code=201, dependencies=[Depends(current_user)])
+async def create_todo(todo: TodoCreate, user=Depends(current_user)):
     """Create a todo item."""
     try:
         if not todo.title.strip():
@@ -295,8 +424,8 @@ async def create_todo(todo: TodoCreate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.patch("/todos/{todo_id}", response_model=TodoItem)
-async def update_todo(todo_id: str, todo: TodoUpdate):
+@app.patch("/todos/{todo_id}", response_model=TodoItem, dependencies=[Depends(current_user)])
+async def update_todo(todo_id: str, todo: TodoUpdate, user=Depends(current_user)):
     """Update a todo item."""
     try:
         if todo.title is not None and not todo.title.strip():
@@ -310,8 +439,8 @@ async def update_todo(todo_id: str, todo: TodoUpdate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/todos/{todo_id}")
-async def delete_todo(todo_id: str):
+@app.delete("/todos/{todo_id}", dependencies=[Depends(current_user)])
+async def delete_todo(todo_id: str, user=Depends(current_user)):
     """Delete a todo item."""
     try:
         if not db.delete_todo(todo_id):
