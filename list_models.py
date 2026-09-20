@@ -3,10 +3,11 @@ Diagnostic: list which Gemini models your API key actually has access to.
 """
 
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 api_key = os.getenv("GOOGLE_API_KEY")
 if not api_key:

@@ -395,11 +395,52 @@
         .auth-box p { color: #8b8f9e; font-size: 13px; margin-bottom: 18px; }
         .auth-box input, .language-select { width: 100%; padding: 11px; margin-bottom: 10px;
             border-radius: 8px; border: 1px solid #2a3347; background: #252d3d; color: white; }
+        .password-input-wrap {
+            position: relative;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .password-input-wrap input {
+            margin-bottom: 0 !important;
+            padding-right: 42px !important;
+        }
+        .password-toggle-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #8b8f9e;
+            cursor: pointer;
+            padding: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            transition: color 0.2s ease;
+        }
+        .password-toggle-btn:hover {
+            color: #a5b4fc;
+        }
         .auth-switch { color: #a5b4fc; cursor: pointer; text-align: center; margin-top: 14px; font-size: 12px; }
         .file-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
-        .file-row input { flex: 1; color: #8b8f9e; font-size: 12px; }
+        .file-row input { display: none; }
         .user-bar { margin-top: auto; border-top: 1px solid #2a3347; padding-top: 14px; font-size: 12px; color: #8b8f9e; }
+        .profile-card { margin-top: auto; padding: 14px 12px; border: 1px solid #552266; border-radius: 11px; background: rgba(31, 17, 45, .85); color: #f4eaf7; }
+        .profile-head { display: flex; align-items: center; gap: 9px; }
+        .profile-avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(135deg, #f151ba, #8e26d9); font-weight: 700; }
+        .profile-head b, .profile-head small { display: block; }
+        .profile-head b { font-size: 12px; }
+        .profile-head small { color: #ad91af; font-size: 10px; margin-top: 2px; }
+        .profile-card p { color: #c6b5ca; font-size: 10px; margin: 12px 0; }
+        .level-row { display: flex; justify-content: space-between; color: #d9c9df; font-size: 9px; }
+        .xp-track { height: 5px; border-radius: 5px; background: #3b244b; margin-top: 6px; overflow: hidden; }
+        .xp-track span { display: block; width: 82%; height: 100%; background: linear-gradient(90deg, #f344ba, #a62de2); }
+        .profile-email { display: block; margin-top: 8px; color: #a990ad; font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .video-link { display: block; color: #a5b4fc; margin-top: 10px; font-size: 12px; }
+        .file-upload { display: inline-flex; align-items: center; gap: 6px; padding: 9px 12px; border: 1px solid #8a3db5; border-radius: 7px; color: #e8a6ff; cursor: pointer; font-size: 11px; }
+        .file-upload:hover { background: rgba(232, 166, 255, .1); }
         .investor-panel {
             position: fixed; inset: 0; z-index: 9; display: none; overflow-y: auto;
             background: rgba(15, 20, 25, 0.98); padding: 36px;
@@ -444,6 +485,109 @@
                 padding: 20px;
             }
         }
+
+        /* Dashboard visual system */
+        :root {
+            --bg: #10091a;
+            --panel: #1a1027;
+            --panel-soft: #211532;
+            --border: #39204e;
+            --pink: #e83bbd;
+            --purple: #8627d9;
+            --muted: #a99bb8;
+        }
+        body { background: radial-gradient(circle at 82% 8%, #291440 0, transparent 31%), var(--bg); color: #f8f3fb; }
+        .container { height: 100vh; }
+        .sidebar { width: 224px; background: rgba(22, 11, 32, .96); border-right: 1px solid var(--border); padding: 22px 14px 14px; }
+        .logo { padding: 0 8px; margin-bottom: 32px; }
+        .logo-icon { width: 38px; height: 38px; background: linear-gradient(135deg, #f532b8, #7d1fe1); box-shadow: 0 8px 24px rgba(225, 35, 181, .28); }
+        .logo-text h2 { font-size: 16px; }
+        .logo-text:after { content: 'Learn. Improve. Grow.'; display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
+        .nav-items { gap: 6px; }
+        .nav-item { padding: 11px 13px; color: #c0b1cb; }
+        .nav-item.active { background: linear-gradient(100deg, #771bc9, #a81be1); box-shadow: 0 8px 22px rgba(128, 24, 207, .25); }
+        .main { min-width: 0; }
+        .header { padding: 16px 22px; background: rgba(18, 9, 28, .65); border-bottom: 1px solid var(--border); }
+        .topbar { display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 20px; }
+        .topbar-actions { display: flex; align-items: center; gap: 10px; }
+        .theme-button { flex: 0 0 auto; width: 34px; height: 34px; padding: 0; border: 1px solid var(--border); background: var(--panel); color: #ff70d5; border-radius: 50%; }
+        .new-analysis-button { flex: 0 0 auto; padding: 9px 15px; }
+        .content { grid-template-columns: minmax(0, 1fr) 310px; align-items: start; gap: 14px; padding: 14px 22px 24px; }
+        .workspace-column { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+        .card, .rail-card { background: rgba(28, 15, 42, .96); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: 0 14px 35px rgba(0, 0, 0, .16); }
+        .code-card { padding: 10px; }
+        .editor-toolbar { display: flex; justify-content: space-between; align-items: center; background: #171025; border: 1px solid #302041; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; }
+        .editor-file { color: #eee4f5; font-size: 12px; }
+        .editor-file i { color: #ffd35c; margin-right: 7px; }
+        .clear-editor { width: auto; flex: 0 0 auto; padding: 3px 9px; color: var(--muted); background: transparent; font-size: 11px; }
+        .editor-label { color: var(--muted); }
+        textarea { height: 274px; background: #100b1b; border-color: #302041; color: #f3a9ff; border-radius: 7px; }
+        .language-select { width: 130px; display: inline-block; margin: 0 0 0 8px; background: #281436; border-color: #4f2369; }
+        .file-row { display: inline-flex; float: left; margin-top: 13px; }
+        .file-row input { max-width: 120px; }
+        .button-group { clear: both; }
+        .button-group button { padding: 9px 11px; }
+        .btn-primary { background: linear-gradient(100deg, #ef28b7, #9a20e3); }
+        .btn-secondary { color: #e8a6ff; border-color: #8a3db5; }
+        .quick-examples { display: none; }
+        .results-card { min-height: 220px; }
+        .results-card #resultsContainer { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        .results-card #resultsContainer > h4, .results-card #resultsContainer > .hints-section, .results-card #resultsContainer > .score-section, .results-card #resultsContainer > .empty-state, .results-card #resultsContainer > .error-message { grid-column: 1 / -1; }
+        .results-card .result-card { min-height: 142px; }
+        .card-title { color: #f9edff; }
+        .results-container { max-height: none; }
+        .right-rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+        .rail-card { background: #f8edf4; color: #2c1830; border-color: #f1d9e9; }
+        .rail-title { font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .rail-title span { color: #988699; font-weight: 400; }
+        .score-card { text-align: center; }
+        .score-ring { width: 116px; height: 116px; margin: 12px auto; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; border: 10px solid #e7d5e7; border-top-color: #8d20d5; border-right-color: #d23bbd; transform: rotate(-25deg); }
+        .score-ring strong, .score-ring small { transform: rotate(25deg); }
+        .score-ring strong { font-size: 28px; line-height: 1; }
+        .score-ring small { font-size: 10px; color: #816d82; margin-top: 3px; }
+        .score-card p { color: #573d5c; font-size: 12px; line-height: 1.45; }
+        .score-breakdown { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid #ead6e5; margin: 14px -14px -14px; padding: 11px 5px; }
+        .score-breakdown span { border-right: 1px solid #ead6e5; }
+        .score-breakdown span:last-child { border: 0; }
+        .score-breakdown b, .score-breakdown em { display: block; font-style: normal; }
+        .score-breakdown b { color: #b22487; font-size: 15px; }
+        .score-breakdown em { color: #806b82; font-size: 9px; }
+        .step-pill { background: #f1cfe6; color: #9e3289 !important; padding: 5px 8px; border-radius: 6px; font-size: 10px; }
+        .rail-hint { background: #fff8fb; border: 1px solid #efdce9; border-radius: 7px; padding: 13px; color: #4d3850; font-size: 12px; line-height: 1.45; min-height: 72px; }
+        .hint-actions { display: flex; gap: 7px; margin-top: 10px; }
+        .hint-actions button { font-size: 10px; padding: 8px 6px; color: #8d438a; border-color: #d99bca; }
+        .hint-actions .btn-primary { color: #fff; }
+        .hint-footer { display: block; color: #9f7896; margin-top: 11px; }
+        .view-all { border: 0; background: none; color: #b32993; font-size: 11px; width: auto; padding: 0; }
+        .recent-item { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid #ead6e5; font-size: 11px; }
+        .recent-item > div { flex: 1; }
+        .recent-item b, .recent-item small { display: block; }
+        .recent-item small { color: #8d788c; margin-top: 3px; }
+        .file-icon { font-size: 17px; }
+        .status-good, .status-bad { padding: 4px 7px; border-radius: 5px; font-size: 9px; }
+        .status-good { background: #c8e9ca; color: #33853d; }
+        .status-bad { background: #f4cad8; color: #a32b58; }
+        .score-section { display: none; }
+        .progress-card { padding: 14px 18px; }
+        .progress-heading { display: flex; justify-content: space-between; align-items: center; }
+        .progress-heading .card-title { margin: 0; }
+        .progress-heading > span { color: #ad91af; font-size: 10px; }
+        .progress-body { display: flex; gap: 20px; align-items: center; }
+        .progress-chart { height: 92px; flex: 1; display: flex; align-items: end; gap: 8px; padding: 8px 4px 0; border-bottom: 1px solid #4b265d; background: repeating-linear-gradient(to bottom, transparent 0, transparent 22px, rgba(112, 57, 126, .24) 23px); }
+        .progress-chart span { flex: 1; min-width: 8px; border-radius: 5px 5px 0 0; background: linear-gradient(180deg, #ee47c2, #8627d9); box-shadow: 0 0 10px rgba(224, 51, 186, .35); }
+        .progress-summary { min-width: 116px; display: grid; gap: 3px; color: #f1e6f4; }
+        .progress-summary strong { font-size: 22px; }
+        .progress-summary small { color: #ad91af; font-size: 10px; }
+        .progress-summary b { font-size: 18px; }
+        .progress-summary button { width: 100%; flex: 0 0 auto; padding: 8px 5px; font-size: 10px; margin-top: 4px; }
+        .light-mode { background: #f5eef7; color: #261329; }
+        .light-mode .main, .light-mode .header { background: #f5eef7; }
+        .light-mode .header h1, .light-mode .card-title { color: #261329; }
+        .light-mode .card, .light-mode .code-card { background: #fffaff; border-color: #e4cce7; }
+        .light-mode textarea { background: #fff; color: #72208d; }
+        @media (max-width: 1050px) { .content { grid-template-columns: minmax(0, 1fr); } .right-rail { display: grid; grid-template-columns: repeat(3, 1fr); } .results-card #resultsContainer { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 768px) { .topbar { align-items: flex-start; gap: 10px; } .new-analysis-button { font-size: 0; } .new-analysis-button i { font-size: 13px; } .right-rail { display: flex; } .content { padding: 12px; } .sidebar { width: 100%; } .results-card #resultsContainer { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -472,24 +616,49 @@
                 <div class="nav-item" onclick="showInvestorDemo()">
                     <i class="fas fa-rocket"></i> Investor Demo
                 </div>
+                <div class="nav-item" onclick="showProgress()">
+                    <i class="fas fa-chart-bar"></i> Progress
+                </div>
+                <div class="nav-item" onclick="showStatistics()">
+                    <i class="fas fa-chart-pie"></i> Statistics
+                </div>
+                <div class="nav-item" onclick="showSavedSnippets()">
+                    <i class="fas fa-bookmark"></i> Saved Snippets
+                </div>
+                <div class="nav-item" onclick="showApiDocs()">
+                    <i class="fas fa-file-lines"></i> API Docs
+                </div>
             </nav>
-            <div class="user-bar"><span id="userEmail">Not signed in</span><br>
+            <div class="profile-card">
+                <div class="profile-head"><span class="profile-avatar">D</span><span><b id="userName">Davichik</b><small>Student</small></span></div>
+                <p>Keep coding, keep growing! 🚀</p>
+                <div class="level-row"><span>Level 7</span><span>2,450 / 3,000 XP</span></div>
+                <div class="xp-track"><span></span></div>
+                <span id="userEmail" class="profile-email">Not signed in</span>
                 <button class="btn-secondary" style="margin-top:8px;width:100%;" onclick="logout()">Sign out</button>
             </div>
         </div>
 
         <!-- Main Content -->
         <div class="main">
-            <div class="header">
-                <h1>Code Analysis</h1>
-                <p style="color: #8b8f9e; margin-top: 4px; font-size: 13px;">Analyze code in any language and learn how to fix errors</p>
+            <div class="header topbar">
+                <div>
+                    <h1>New Code Analysis</h1>
+                    <p style="color: #8b8f9e; margin-top: 4px; font-size: 13px;">Paste your code below and get AI-powered feedback</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="theme-button" onclick="document.body.classList.toggle('light-mode')" aria-label="Toggle theme">☾</button>
+                    <button class="btn-primary new-analysis-button" onclick="clearCode()"><i class="fas fa-plus"></i> New Analysis</button>
+                </div>
             </div>
 
             <div class="content">
+                <div class="workspace-column">
                 <!-- Code Input -->
-                <div class="card">
+                <div class="card code-card">
                     <div class="code-editor">
-                        <label class="editor-label">📝 Paste code or upload any file:</label>
+                        <div class="editor-toolbar"><span class="editor-file"><i class="fab fa-python"></i> <span id="editorFileLabel">main.py</span></span><button class="clear-editor" onclick="clearCode()">Clear</button></div>
+                        <label class="editor-label">Paste code or upload any file:</label>
                         <select id="languageSelect" class="language-select">
                             <option value="">Auto-detect language</option>
                             <option>Python</option><option>JavaScript</option><option>TypeScript</option>
@@ -502,12 +671,13 @@
 
 # Add your code here..."></textarea>
                         <div class="file-row">
+                            <label class="file-upload" for="fileInput"><i class="fas fa-upload"></i> Upload File</label>
                             <input id="fileInput" type="file" onchange="loadFile(event)">
                             <span id="fileName" style="font-size:11px;color:#8b8f9e;">No file selected</span>
                         </div>
                         <div class="button-group">
                             <button class="btn-primary" onclick="analyzeCode()">
-                                <i class="fas fa-play"></i> Analyze
+                                <i class="fas fa-wand-magic-sparkles"></i> Analyze Code
                             </button>
                             <button class="btn-secondary" onclick="clearCode()">
                                 <i class="fas fa-trash"></i> Clear
@@ -531,14 +701,52 @@
                 </div>
 
                 <!-- Results -->
-                <div class="card">
+                <div class="card results-card">
                     <h3 class="card-title">✨ Analysis Results</h3>
                     <div id="resultsContainer">
                         <div class="empty-state">
                             <div class="empty-icon">📋</div>
                             <p>Paste code and click "Analyze" to get started</p>
                         </div>
+                </div>
+                <div class="card progress-card">
+                        <div class="progress-heading"><h3 class="card-title">Your Progress</h3><span>Average Score</span></div>
+                        <div class="progress-body">
+                            <div class="progress-chart" aria-label="Progress chart">
+                                <span style="height:24%"></span><span style="height:39%"></span><span style="height:50%"></span>
+                                <span style="height:62%"></span><span style="height:68%"></span><span style="height:74%"></span>
+                                <span style="height:82%"></span><span style="height:91%"></span><span style="height:97%"></span>
+                            </div>
+                            <div class="progress-summary"><strong id="progressAverage">--</strong><small>Analyses</small><b id="progressCount">0</b><button class="btn-primary" onclick="showProgress()">View Progress →</button></div>
+                        </div>
+                        </div>
                     </div>
+
+                    <aside class="right-rail">
+                        <div class="rail-card score-card">
+                            <div class="rail-title">Overall Score <span>ⓘ</span></div>
+                            <div class="score-ring"><strong id="railScore">--</strong><small>/ 100</small></div>
+                            <p id="railFeedback">Analyze your code to see your score.</p>
+                            <div class="score-breakdown">
+                                <span><b id="railCritical">0</b><em>Critical</em></span>
+                                <span><b id="railImprovement">0</b><em>Improvement</em></span>
+                                <span><b id="railLearning">0</b><em>Learning</em></span>
+                                <span><b id="railGood">0</b><em>Good</em></span>
+                            </div>
+                        </div>
+                        <div class="rail-card mentor-card">
+                            <div class="rail-title">Mentor Mode <span class="step-pill">Step 1 of 3</span></div>
+                            <div id="railHint" class="rail-hint">Your next hint will appear here after analysis.</div>
+                            <div class="hint-actions"><button class="btn-secondary" onclick="changeHint(-1)">← Previous Hint</button><button class="btn-primary" onclick="changeHint(1)">Next Hint →</button></div>
+                            <small class="hint-footer">💡 Hints help you find the solution yourself!</small>
+                        </div>
+                        <div class="rail-card recent-card">
+                            <div class="rail-title">Recent Analyses <button class="view-all" onclick="loadHistory()">View all</button></div>
+                            <div class="recent-item"><span class="file-icon">🐍</span><div><b>user_auth.py</b><small>Score: 78/100</small></div><span class="status-good">Good</span></div>
+                            <div class="recent-item"><span class="file-icon">🐍</span><div><b>data_processing.py</b><small>Score: 85/100</small></div><span class="status-good">Good</span></div>
+                            <div class="recent-item"><span class="file-icon">🌐</span><div><b>web_scraper.py</b><small>Score: 45/100</small></div><span class="status-bad">Bad</span></div>
+                        </div>
+                    </aside>
                 </div>
             </div>
         </div>
@@ -605,7 +813,12 @@
             <p id="authSubtitle">Registration is required before using the mentor.</p>
             <input id="authName" placeholder="Display name (optional)">
             <input id="authEmail" type="email" placeholder="Email">
-            <input id="authPassword" type="password" placeholder="Password (10+ chars, upper/lower/number/symbol)">
+            <div class="password-input-wrap">
+                <input id="authPassword" type="password" placeholder="Password (10+ chars, upper/lower/number/symbol)">
+                <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('authPassword', 'togglePasswordIcon')" title="Show/hide password" aria-label="Toggle password visibility">
+                    <i id="togglePasswordIcon" class="fas fa-eye"></i>
+                </button>
+            </div>
             <input id="authCode" inputmode="numeric" maxlength="6" placeholder="Email verification code" style="display:none">
             <button class="btn-primary" style="width:100%;" onclick="submitAuth()" id="authSubmit">Register</button>
             <div class="auth-switch" onclick="toggleAuthMode()" id="authSwitch">Already have an account? Sign in</div>
@@ -614,13 +827,36 @@
     </div>
 
     <script>
-        const API_URL = 'https://ai-code-mentor-backend-z80q.onrender.com';
+        const API_URL = (() => {
+            const host = location.hostname;
+            if (location.protocol === 'file:') return 'https://ai-code-mentor-backend-z80q.onrender.com';
+            if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000';
+            if (host.endsWith('onrender.com')) return '';
+            return 'https://ai-code-mentor-backend-z80q.onrender.com';
+        })();
         let authMode = 'register';
         let selectedFilename = 'analysis.txt';
+        let currentHints = [];
+        let currentHintIndex = 0;
 
         function authHeaders() {
             const token = localStorage.getItem('mentor_token');
             return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+
+        function togglePasswordVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (!input || !icon) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
         }
 
         function toggleAuthMode() {
@@ -632,7 +868,7 @@
                 ? 'Already have an account? Sign in' : 'No account yet? Register';
         }
 
-        async function submitAuth() {
+        function submitAuth() {
             const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPassword').value;
             const error = document.getElementById('authError');
@@ -643,7 +879,17 @@
                 const response = await fetch(`${API_URL}/auth/${authMode}`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.detail || 'Authentication failed');
-                if (authMode === 'register') {
+                if (authMode === 'register' && data.access_token && !data.verification_required) {
+                    localStorage.setItem('mentor_token', data.access_token);
+                    document.getElementById('authOverlay').style.display = 'none';
+                    const user = data.user || { display_name: email.split('@')[0], email };
+                    document.getElementById('userEmail').textContent = (user.display_name || user.email) || email;
+                    document.getElementById('userName').textContent = user.display_name || email.split('@')[0];
+                    if (user.level) {
+                        document.querySelector('.level-row span:first-child').textContent = `Level ${user.level}`;
+                        document.querySelector('.level-row span:last-child').textContent = `${user.xp_current || 0} / ${user.xp_needed || 1000} XP`;
+                    }
+                } else if (authMode === 'register') {
                     document.getElementById('authCode').style.display = 'block';
                     document.getElementById('authSubmit').textContent = 'Verify email';
                     document.getElementById('authSubmit').onclick = verifyEmail;
@@ -652,7 +898,13 @@
                 } else {
                     localStorage.setItem('mentor_token', data.access_token);
                     document.getElementById('authOverlay').style.display = 'none';
-                    document.getElementById('userEmail').textContent = data.user.display_name || data.user.email;
+                    const user = data.user || {};
+                    document.getElementById('userEmail').textContent = user.display_name || user.email;
+                    document.getElementById('userName').textContent = user.display_name || user.email.split('@')[0];
+                    if (user.level) {
+                        document.querySelector('.level-row span:first-child').textContent = `Level ${user.level}`;
+                        document.querySelector('.level-row span:last-child').textContent = `${user.xp_current || 0} / ${user.xp_needed || 1000} XP`;
+                    }
                 }
             } catch (e) { error.textContent = e.message; error.style.display = 'block'; }
         }
@@ -673,6 +925,7 @@
         async function loadFile(event) {
             const file = event.target.files[0]; if (!file) return;
             selectedFilename = file.name; document.getElementById('fileName').textContent = file.name;
+            document.getElementById('editorFileLabel').textContent = file.name;
             try { document.getElementById('codeInput').value = await file.text(); }
             catch (e) { showError('This file cannot be read as text. Binary files are accepted, but upload a text source file for analysis.'); }
         }
@@ -715,6 +968,8 @@ def get_user(user_id):
 
         function clearCode() {
             document.getElementById('codeInput').value = '';
+            selectedFilename = 'analysis.txt';
+            document.getElementById('editorFileLabel').textContent = 'main.py';
             document.getElementById('resultsContainer').innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon">📋</div>
@@ -750,14 +1005,23 @@ def get_user(user_id):
                 });
 
                 if (!response.ok) {
-                    throw new Error('API Error: ' + response.statusText);
+                    let detail = 'API Error: ' + response.status;
+                    try { const err = await response.json(); detail = err.detail || detail; } catch (e) {}
+                    throw new Error(detail);
                 }
 
                 const data = await response.json();
                 displayResults(data);
 
             } catch (error) {
-                showError(error.message.includes('401') ? 'Please sign in again.' : 'Cannot connect to the analysis server.');
+                const msg = String(error.message || '');
+                if (msg.includes('401') || /required|expired|sign in/i.test(msg)) {
+                    showError('Please sign in again.');
+                } else if (/Failed to fetch|NetworkError|Cannot connect/i.test(msg)) {
+                    showError('Cannot connect to the analysis server. Open http://localhost:8000/app after starting the backend.');
+                } else {
+                    showError(msg);
+                }
                 console.error('Error:', error);
             }
         }
@@ -782,6 +1046,21 @@ def get_user(user_id):
         function displayResults(data) {
             const feedback = data.feedback;
             let html = '';
+            currentHints = data.mentor_hints || [];
+            currentHintIndex = 0;
+            const criticalCount = (feedback.critical || []).length;
+            const improvementCount = (feedback.improvements || []).length;
+            const learningCount = (feedback.learning || []).length;
+            const goodCount = (feedback.good || []).length;
+            document.getElementById('railScore').textContent = data.score;
+            document.getElementById('railCritical').textContent = criticalCount;
+            document.getElementById('railImprovement').textContent = improvementCount;
+            document.getElementById('railLearning').textContent = learningCount;
+            document.getElementById('railGood').textContent = goodCount;
+            document.getElementById('railFeedback').textContent = data.summary || getScoreFeedback(data.score);
+            if (data.mentor_hints && data.mentor_hints.length) {
+                document.getElementById('railHint').textContent = data.mentor_hints[0].hint;
+            }
 
             // Score
             html += `
@@ -861,16 +1140,72 @@ def get_user(user_id):
         }
 
         async function loadHistory() {
-            const response = await fetch(`${API_URL}/history`, { headers: authHeaders() });
-            const data = await response.json();
-            document.getElementById('resultsContainer').innerHTML = (data.analyses || []).map(item =>
-                `<div class="result-card good"><h4 class="result-title">${escapeHtml(item.filename)} — ${item.score}/100</h4><p class="result-text">${escapeHtml(item.feedback_summary)}</p></div>`
-            ).join('') || '<div class="empty-state">No analyses yet.</div>';
+            try {
+                const response = await fetch(`${API_URL}/history`, { headers: authHeaders() });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Unable to load history');
+                document.getElementById('resultsContainer').innerHTML = (data.analyses || []).map(item =>
+                    `<div class="result-card good"><h4 class="result-title">${escapeHtml(item.filename)} — ${item.score}/100</h4><p class="result-text">${escapeHtml(item.feedback_summary)}</p></div>`
+                ).join('') || '<div class="empty-state">No analyses yet.</div>';
+            } catch (error) {
+                showError(error.message);
+            }
         }
 
         function showDashboard() { location.reload(); }
         function showSettings() {
-            document.getElementById('resultsContainer').innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div><p>Settings are saved automatically in this browser. Use Sign out to switch accounts.</p></div>';
+            document.getElementById('resultsContainer').innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div><p>Settings are saved automatically in this browser.</p><button class="btn-secondary" onclick="logout()">Sign out</button></div>';
+        }
+
+        function changeHint(direction) {
+            if (!currentHints.length) {
+                document.getElementById('railHint').textContent = 'Analyze code first to unlock mentor hints.';
+                return;
+            }
+            currentHintIndex = (currentHintIndex + direction + currentHints.length) % currentHints.length;
+            document.getElementById('railHint').textContent = currentHints[currentHintIndex].hint;
+            document.querySelector('.step-pill').textContent = `Step ${currentHintIndex + 1} of ${currentHints.length}`;
+        }
+
+        async function showProgress() {
+            try {
+                const response = await fetch(`${API_URL}/progress`, { headers: authHeaders() });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Unable to load progress');
+                document.getElementById('progressAverage').textContent = data.average_score || 0;
+                document.getElementById('progressCount').textContent = data.total_analyses || 0;
+                document.getElementById('resultsContainer').innerHTML = `<div class="empty-state"><div class="empty-icon">📈</div><p>Average score: <strong>${data.average_score || 0}</strong><br>Total analyses: <strong>${data.total_analyses || 0}</strong></p></div>`;
+            } catch (error) { showError(error.message); }
+        }
+
+        async function showStatistics() {
+            try {
+                const response = await fetch(`${API_URL}/stats`, { headers: authHeaders() });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Unable to load statistics');
+                document.getElementById('resultsContainer').innerHTML = `<div class="empty-state"><div class="empty-icon">📊</div><p>Analyses: <strong>${data.total_analyses || 0}</strong><br>Average score: <strong>${data.average_score || 0}</strong><br>Best score: <strong>${data.best_score || 0}</strong></p></div>`;
+            } catch (error) { showError(error.message); }
+        }
+
+        function showSavedSnippets() {
+            const code = document.getElementById('codeInput').value.trim();
+            if (code) localStorage.setItem('mentor_saved_snippet', JSON.stringify({ filename: selectedFilename, code }));
+            const saved = JSON.parse(localStorage.getItem('mentor_saved_snippet') || 'null');
+            document.getElementById('resultsContainer').innerHTML = saved
+                ? `<div class="result-card good"><h4 class="result-title">${escapeHtml(saved.filename)}</h4><p class="result-text">Saved snippet is ready.</p><button class="btn-primary" onclick="restoreSnippet()">Open snippet</button></div>`
+                : '<div class="empty-state"><div class="empty-icon">🔖</div><p>No saved snippets yet. Enter code and open Saved Snippets to save it.</p></div>';
+        }
+
+        function restoreSnippet() {
+            const saved = JSON.parse(localStorage.getItem('mentor_saved_snippet') || 'null');
+            if (!saved) return;
+            selectedFilename = saved.filename;
+            document.getElementById('codeInput').value = saved.code;
+            document.getElementById('editorFileLabel').textContent = saved.filename;
+        }
+
+        function showApiDocs() {
+            window.open(`${API_URL || location.origin}/docs`, '_blank', 'noopener');
         }
 
         function showInvestorDemo() {
@@ -913,6 +1248,11 @@ def find_user(user_id):
                         const data = await me.json();
                         document.getElementById('authOverlay').style.display = 'none';
                         document.getElementById('userEmail').textContent = data.display_name || data.email;
+                        document.getElementById('userName').textContent = data.display_name || data.email.split('@')[0];
+                        if (data.level) {
+                            document.querySelector('.level-row span:first-child').textContent = `Level ${data.level}`;
+                            document.querySelector('.level-row span:last-child').textContent = `${data.xp_current || 0} / ${data.xp_needed || 1000} XP`;
+                        }
                     } else localStorage.removeItem('mentor_token');
                 } catch (e) { console.warn('Authentication check failed', e); }
             }

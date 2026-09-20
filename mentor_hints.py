@@ -1,14 +1,14 @@
 """
-Mentor Mode — generates progressive hints (not answers) from analysis feedback.
+Mentor Mode — генерирует прогрессивные подсказки (не готовые ответы) из фидбека.
 
-Philosophy (from the product plan): don't hand the student a fix,
-guide them toward finding it themselves through 3 escalating hints:
-  Level 1: "Have you noticed...?"      (awareness)
-  Level 2: "What happens if...?"       (investigation)
-  Level 3: "Which pattern/concept...?" (naming the solution)
+Философия (из продуктового плана): не давать студенту готовое решение,
+а направлять его к самостоятельному поиску через 3 нарастающие подсказки:
+  Уровень 1: «Ты заметил...?»           (осознание)
+  Уровень 2: «Что случится, если...?»   (исследование)
+  Уровень 3: «Какой паттерн/концепт...?» (называние решения)
 
-Each hint group can carry a `learning_resource` pulled from the
-RAG engine so the UI can show "why" with a citation.
+Каждая группа подсказок может нести `learning_resource` из RAG-движка,
+чтобы UI мог показать «почему» со ссылкой на источник.
 """
 
 from typing import List, Dict, Optional
@@ -20,35 +20,33 @@ class MentorMode:
 
     def generate_hints(self, feedback: dict) -> List[Dict]:
         """
-        Build a flat, ordered list of hints across critical + improvement
-        items. Each hint dict has: level ('critical'|'hint'|'learn'),
-        hint (progression step 1 text), guide (step 2 text), and
-        optionally a nested 'progression' list of 3 steps plus a
-        'learning_resource' if RAG found something relevant.
+        Строит плоский упорядоченный список подсказок по критическим проблемам
+        и улучшениям. Каждый dict содержит: level ('critical'|'hint'|'learn'),
+        hint (текст шага 1), guide (текст шага 2) и опционально
+        'learning_resource' если RAG нашёл что-то релевантное.
 
-        Returns at most 4 hint groups to keep Mentor Mode focused.
+        Возвращает не более 4 групп подсказок для сохранения фокуса.
         """
         groups: List[Dict] = []
 
         for item in (feedback.get("critical") or [])[:2]:
             groups.append(self._build_group(item, level="critical",
-                                              title_field="issue",
-                                              detail_field="explanation"))
+                                             title_field="issue",
+                                             detail_field="explanation"))
 
         for item in (feedback.get("improvements") or [])[:2]:
             groups.append(self._build_group(item, level="hint",
-                                              title_field="issue",
-                                              detail_field="explanation"))
+                                             title_field="issue",
+                                             detail_field="explanation"))
 
         if not groups and feedback.get("learning"):
             item = feedback["learning"][0]
             groups.append(self._build_group(item, level="learn",
-                                              title_field="topic",
-                                              detail_field="explanation"))
+                                             title_field="topic",
+                                             detail_field="explanation"))
 
-        # Flatten each group's 3-step progression into individual hint
-        # entries so the frontend's Next/Previous stepping (Mentor Mode
-        # widget) can walk through them one at a time, in order.
+        # Разворачиваем каждую группу из 3 шагов в отдельные записи,
+        # чтобы кнопки «Назад»/«Вперёд» в Mentor Mode шли по одной подсказке.
         flat: List[Dict] = []
         for g in groups[:4]:
             for step_text in g["progression"]:
@@ -61,13 +59,16 @@ class MentorMode:
         return flat if flat else self._fallback_hint()
 
     def _build_group(self, item: dict, level: str, title_field: str, detail_field: str) -> Dict:
-        title = item.get(title_field, "this part of your code")
+        title = item.get(title_field, "эту часть кода")
         detail = item.get(detail_field, "")
 
+        # Переводим технические заголовки проблем на русский
+        ru_title = self._translate_issue(title)
+
         progression = [
-            f"💡 Have you noticed: {title}?",
-            f"🤔 What would happen if you ran this with unexpected input, or someone tried to exploit it?",
-            f"📚 Think about the underlying concept here — {self._name_pattern(title, detail)}",
+            f"💡 Ты заметил: {ru_title}?".encode('utf-8').decode('utf-8'),
+            f"🤔 Что произойдёт, если передать сюда неожиданные данные или кто-то попытается это использовать?".encode('utf-8').decode('utf-8'),
+            f"📚 Подумай об основной концепции — {self._name_pattern(title, detail)}".encode('utf-8').decode('utf-8'),
         ]
 
         resource = None
@@ -82,35 +83,82 @@ class MentorMode:
 
         return {
             "level": level,
-            "title": title,
+            "title": ru_title,
             "progression": progression,
             "learning_resource": resource or {},
         }
 
     @staticmethod
+    def _translate_issue(title: str) -> str:
+        """Переводит типовые заголовки проблем с английского на русский."""
+        translations = {
+            "sql injection":             "SQL-инъекция",
+            "sql":                       "SQL-инъекция",
+            "injection":                 "инъекция данных",
+            "resource leak":             "утечка ресурсов",
+            "missing type hint":         "отсутствуют аннотации типов",
+            "type hint":                 "отсутствуют аннотации типов",
+            "missing docstring":         "отсутствует документация (docstring)",
+            "docstring":                 "отсутствует документация (docstring)",
+            "exception handling":        "обработка исключений",
+            "missing exception":         "отсутствует обработка исключений",
+            "lack of exception":         "отсутствует обработка исключений",
+            "race condition":            "состояние гонки (race condition)",
+            "toctou":                    "состояние гонки (TOCTOU)",
+            "syntax error":              "синтаксическая ошибка",
+            "nameerror":                 "обращение к неопределённой переменной",
+            "undefined variable":        "неопределённая переменная",
+            "hardcoded":                 "захардкоженные данные",
+            "password":                  "небезопасное хранение пароля",
+            "eafp":                      "принцип EAFP не соблюдён",
+            "context manager":           "отсутствует менеджер контекста",
+            "missing connection":        "соединение не закрывается явно",
+            "connection context":        "соединение не закрывается явно",
+            "loop":                      "неэффективный цикл",
+            "list comprehension":        "не использован list comprehension",
+            "performance":               "проблема производительности",
+            "readability":               "недостаточная читаемость",
+            "naming":                    "именование переменных",
+            "global variable":           "использование глобальных переменных",
+        }
+        lower = title.lower()
+        for key, ru in translations.items():
+            if key in lower:
+                return ru
+        # Если перевод не найден — возвращаем оригинал без изменений
+        return title
+
+    @staticmethod
     def _name_pattern(title: str, detail: str) -> str:
-        """Best-effort guess at what concept to name in the final hint step."""
+        """Определяет ключевой концепт для шага 3 подсказки."""
         combined = f"{title} {detail}".lower()
         patterns = {
-            "sql": "parameterized queries / prepared statements",
-            "inject": "input sanitization",
-            "loop": "iterating directly over a collection instead of by index",
-            "range(len": "the 'for item in list' pattern",
-            "type hint": "static typing with type hints",
-            "docstring": "documenting functions with docstrings",
-            "except": "specific exception handling",
-            "password": "secrets management / environment variables",
-            "hardcode": "environment variables for configuration",
+            "sql":          "параметризованные запросы / prepared statements",
+            "inject":       "санитизация пользовательского ввода",
+            "loop":         "итерация напрямую по коллекции (for item in list)",
+            "range(len":    "паттерн «for item in list»",
+            "type hint":    "статическая типизация с аннотациями типов",
+            "docstring":    "документирование функций через docstring",
+            "except":       "обработка конкретных исключений",
+            "password":     "управление секретами / переменные окружения",
+            "hardcode":     "переменные окружения для конфигурации",
+            "context":      "менеджер контекста (with statement)",
+            "resource":     "менеджер контекста (with statement)",
+            "toctou":       "атомарные операции и EAFP-подход",
+            "race":         "атомарные операции и EAFP-подход",
+            "eafp":         "принцип EAFP вместо LBYL",
+            "global":       "избегание глобального состояния",
+            "comprehension":"list / dict comprehension",
         }
         for key, name in patterns.items():
             if key in combined:
                 return name
-        return "a more Pythonic / robust approach"
+        return "более питонический и надёжный подход"
 
     @staticmethod
     def _fallback_hint() -> List[Dict]:
         return [{
             "level": "hint",
-            "hint": "✅ No major issues found — nice work! Try uploading another file to keep practicing.",
+            "hint": "✅ Серьёзных проблем не найдено — отличная работа! Загрузи другой файл, чтобы продолжить практику.",
             "guide": "",
         }]

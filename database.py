@@ -96,7 +96,8 @@ class Database:
     # ------------------------------------------------------------------
     def create_user(self, email: str, password_hash: str, display_name: Optional[str] = None,
                     verification_token_hash: Optional[str] = None,
-                    verification_expires_at: Optional[str] = None) -> Optional[str]:
+                    verification_expires_at: Optional[str] = None,
+                    email_verified: int = 0) -> Optional[str]:
         """Create a new user. Returns the new user's id, or None if email already exists."""
         try:
             conn = sqlite3.connect(self.db_path)
@@ -106,9 +107,10 @@ class Database:
             try:
                 cursor.execute('''
                     INSERT INTO users
-                    (id, email, password_hash, display_name, verification_token_hash, verification_expires_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', (user_id, email.lower().strip(), password_hash, display_name,
+                    (id, email, password_hash, display_name, email_verified,
+                     verification_token_hash, verification_expires_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (user_id, email.lower().strip(), password_hash, display_name, email_verified,
                       verification_token_hash, verification_expires_at))
                 conn.commit()
                 return user_id
@@ -145,13 +147,28 @@ class Database:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
+
             cursor.execute('SELECT id, email, display_name, email_verified, created_at FROM users WHERE id = ?', (user_id,))
             row = cursor.fetchone()
             conn.close()
-            
+
             if row:
-                return dict(row)
+                user_dict = dict(row)
+                # Calculate level and XP from analyses count
+                stats_conn = sqlite3.connect(self.db_path)
+                stats_cur = stats_conn.cursor()
+                stats_cur.execute('SELECT COUNT(*) as count, AVG(score) as avg_score FROM analyses WHERE user_id = ?', (user_id,))
+                stats = stats_cur.fetchone()
+                analysis_count = stats[0] or 0
+                avg_score = stats[1] or 0
+                stats_conn.close()
+
+                # Level formula: 1 + (analyses / 10), XP: analyses * 10 + avg_score
+                user_dict['level'] = 1 + (analysis_count // 10)
+                user_dict['xp_current'] = analysis_count * 10 + int(avg_score)
+                user_dict['xp_needed'] = (user_dict['level'] + 1) * 1000
+
+                return user_dict
             return None
         except Exception as e:
             print(f"Error looking up user: {e}")
@@ -222,14 +239,17 @@ class Database:
             print(f"Error saving analysis: {e}")
             raise
     
-    def get_analysis(self, analysis_id: str) -> Optional[Dict]:
+    def get_analysis(self, analysis_id: str, user_id: Optional[str] = None) -> Optional[Dict]:
         """Get specific analysis by ID"""
         try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            cursor.execute('SELECT * FROM analyses WHERE id = ?', (analysis_id,))
+            if user_id:
+                cursor.execute('SELECT * FROM analyses WHERE id = ? AND user_id = ?', (analysis_id, user_id))
+            else:
+                cursor.execute('SELECT * FROM analyses WHERE id = ?', (analysis_id,))
             row = cursor.fetchone()
             conn.close()
             
@@ -366,13 +386,16 @@ class Database:
         finally:
             conn.close()
     
-    def delete_analysis(self, analysis_id: str) -> bool:
+    def delete_analysis(self, analysis_id: str, user_id: Optional[str] = None) -> bool:
         """Delete analysis from database"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            cursor.execute('DELETE FROM analyses WHERE id = ?', (analysis_id,))
+            if user_id:
+                cursor.execute('DELETE FROM analyses WHERE id = ? AND user_id = ?', (analysis_id, user_id))
+            else:
+                cursor.execute('DELETE FROM analyses WHERE id = ?', (analysis_id,))
             cursor.execute('DELETE FROM feedback_cache WHERE analysis_id = ?', (analysis_id,))
             
             conn.commit()
