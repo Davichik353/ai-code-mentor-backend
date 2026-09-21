@@ -129,9 +129,10 @@ app = FastAPI(
 )
 
 # Enable CORS for frontend
+# NOTE: Temporarily allow all origins so Vercel preview URLs don't break registration demo.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8000", "http://127.0.0.1:8000", "https://ai-code-mentor-backend-z80q.onrender.com"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
