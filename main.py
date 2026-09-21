@@ -128,13 +128,25 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Enable CORS for frontend
-# NOTE: Temporarily allow all origins so Vercel preview URLs don't break registration demo.
+# Enable CORS for frontend. Additional origins can be supplied as a comma-separated
+# FRONTEND_ORIGINS environment variable for a custom Vercel domain or preview URL.
+frontend_origins = {
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://ai-code-mentor-frontend.vercel.app",
+    "https://ai-code-mentor-backend-z80q.onrender.com",
+}
+frontend_origins.update(
+    origin.strip().rstrip("/")
+    for origin in os.getenv("FRONTEND_ORIGINS", "").split(",")
+    if origin.strip()
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=sorted(frontend_origins),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -202,12 +214,19 @@ async def register(user: UserRegister, request: Request):
         raise HTTPException(status_code=400, detail="Password must be 10+ characters with upper, lower, number, and symbol")
     now = datetime.now().timestamp()
     client_ip = request.client.host if request.client else "unknown"
-    recent = [stamp for stamp in registration_attempts.get(client_ip, []) if now - stamp < 3600]
-    if len(recent) >= 5:
+    # Rate limit by IP
+    recent_ip = [stamp for stamp in registration_attempts.get(client_ip, []) if now - stamp < 3600]
+    if len(recent_ip) >= 5:
         raise HTTPException(status_code=429, detail="Too many registration attempts. Try again later.")
-    registration_attempts[client_ip] = recent + [now]
+    registration_attempts[client_ip] = recent_ip + [now]
+    # Rate limit by email
+    email_attempts = registration_attempts.get(f"email_{email}", [])
+    recent_email = [stamp for stamp in email_attempts if now - stamp < 3600]
+    if len(recent_email) >= 3:
+        raise HTTPException(status_code=429, detail="Too many attempts for this email. Try again later.")
+    registration_attempts[f"email_{email}"] = recent_email + [now]
     verify = require_email_verification()
-    token = str(secrets.randbelow(900000) + 100000)
+    token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(token.encode()).hexdigest() if verify else None
     expires = (datetime.now() + timedelta(minutes=30)).isoformat() if verify else None
     user_id = db.create_user(
@@ -234,7 +253,7 @@ async def register(user: UserRegister, request: Request):
 
 @app.post("/auth/verify-email", response_model=TokenResponse)
 async def verify_email(email: str, code: str):
-    if not is_valid_email(email) or not code.isdigit() or len(code) != 6:
+    if not is_valid_email(email) or not code or len(code) < 10:
         raise HTTPException(status_code=400, detail="Invalid verification details")
     user = db.verify_user_email(hashlib.sha256(code.encode()).hexdigest())
     if not user or user["email"].lower() != email.lower().strip():

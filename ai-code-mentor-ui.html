@@ -264,7 +264,6 @@
             border-radius: 12px;
             padding: 12px 12px 10px;
         }
-        }
 
         .loading {
             text-align: center;
@@ -371,6 +370,7 @@
             font-size: 48px;
             font-weight: 700;
             background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 4px;
@@ -784,7 +784,7 @@ print(user)
                             <span id="fileName" style="font-size:11px;color:#8b8f9e;">No file selected</span>
                         </div>
                         <div class="button-group">
-                            <button class="btn-primary" onclick="analyzeCode()">
+                            <button class="btn-primary" id="analyzeButton" onclick="analyzeCode()">
                                 <i class="fas fa-wand-magic-sparkles"></i> Analyze Code
                             </button>
                             <button class="btn-secondary" onclick="clearCode()">
@@ -1119,6 +1119,8 @@ def get_user(user_id):
         }
 
         async function analyzeCode() {
+            const analyzeButton = document.getElementById('analyzeButton');
+            if (analyzeButton && analyzeButton.disabled) return;
             const code = document.getElementById('codeInput').value.trim();
 
             if (!code) {
@@ -1132,6 +1134,7 @@ def get_user(user_id):
             }
 
             showLoading();
+            if (analyzeButton) analyzeButton.disabled = true;
 
             try {
                 const response = await fetch(`${API_URL}/analyze`, {
@@ -1163,6 +1166,8 @@ def get_user(user_id):
                     showError(msg);
                 }
                 console.error('Error:', error);
+            } finally {
+                if (analyzeButton) analyzeButton.disabled = false;
             }
         }
 

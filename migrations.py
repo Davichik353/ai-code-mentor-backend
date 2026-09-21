@@ -75,11 +75,13 @@ def run_migrations(db_path: str = "code_mentor.db"):
         user_cols = {row[1] for row in cursor.fetchall()}
         if "updated_at" not in user_cols:
             print("[Migration] Adding updated_at to users table...")
+            cursor.execute("ALTER TABLE users ADD COLUMN updated_at DATETIME")
             cursor.execute(
-                "ALTER TABLE users ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+                "UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL"
             )
 
         # 3. Vacuum to optimize database file
+        conn.commit()
         print("[Migration] Running VACUUM to optimize database...")
         cursor.execute("VACUUM")
 
