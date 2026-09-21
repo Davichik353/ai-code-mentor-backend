@@ -296,6 +296,12 @@ async def analyze_code(request: CodeAnalysisRequest, user=Depends(current_user))
             filename=request.filename or "code.py",
             language=language
         )
+
+        if analysis_result.get("analysis_available") is False:
+            raise HTTPException(
+                status_code=503,
+                detail=analysis_result.get("summary", "AI analysis service is unavailable")
+            )
         
         # Calculate score
         score = analyzer.calculate_score(analysis_result)
@@ -308,6 +314,7 @@ async def analyze_code(request: CodeAnalysisRequest, user=Depends(current_user))
             score=score,
             user_id=user["id"]
         )
+        cache.delete(CacheKey.progress_stats(user["id"]))
         
         # Create response
         response = CodeAnalysisResponse(
@@ -366,7 +373,7 @@ async def get_analysis(analysis_id: str, user=Depends(current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/progress")
-async def get_progress(request: Request):
+async def get_progress(request: Request, user=Depends(current_user)):
     """
     Get progress statistics with caching and rate limiting.
     Cached for 60 seconds to reduce database load.
@@ -384,16 +391,16 @@ async def get_progress(request: Request):
         )
 
     # Check cache
-    cached_stats = cache.get(CacheKey.progress_stats())
+    cached_stats = cache.get(CacheKey.progress_stats(user["id"]))
     if cached_stats is not None:
         metrics.record("progress", "GET", (time.time() - start_time) * 1000, 200)
         return cached_stats
 
     # Generate stats
     try:
-        stats = db.get_progress_stats()
+        stats = db.get_progress_stats(user_id=user["id"])
         # Cache for 60 seconds
-        cache.set(CacheKey.progress_stats(), stats, ttl_seconds=60)
+        cache.set(CacheKey.progress_stats(user["id"]), stats, ttl_seconds=60)
         metrics.record("progress", "GET", (time.time() - start_time) * 1000, 200)
         return stats
     except Exception as e:

@@ -157,7 +157,11 @@ class Database:
                 # Calculate level and XP from analyses count
                 stats_conn = sqlite3.connect(self.db_path)
                 stats_cur = stats_conn.cursor()
-                stats_cur.execute('SELECT COUNT(*) as count, AVG(score) as avg_score FROM analyses WHERE user_id = ?', (user_id,))
+                stats_cur.execute('''
+                    SELECT COUNT(*) as count, AVG(score) as avg_score
+                    FROM analyses
+                    WHERE user_id = ? AND feedback NOT LIKE '%AI analysis unavailable%'
+                ''', (user_id,))
                 stats = stats_cur.fetchone()
                 analysis_count = stats[0] or 0
                 avg_score = stats[1] or 0
@@ -280,7 +284,7 @@ class Database:
                 cursor.execute('''
                     SELECT id, filename, code, score, timestamp, feedback
                     FROM analyses
-                    WHERE user_id = ?
+                    WHERE user_id = ? AND feedback NOT LIKE '%AI analysis unavailable%'
                     ORDER BY timestamp DESC
                     LIMIT ?
                 ''', (user_id, limit))
@@ -288,6 +292,7 @@ class Database:
                 cursor.execute('''
                     SELECT id, filename, code, score, timestamp, feedback
                     FROM analyses
+                    WHERE feedback NOT LIKE '%AI analysis unavailable%'
                     ORDER BY timestamp DESC
                     LIMIT ?
                 ''', (limit,))
@@ -407,15 +412,26 @@ class Database:
             print(f"Error deleting analysis: {e}")
             return False
     
-    def get_progress_stats(self) -> Dict:
-        """Get progress statistics"""
+    def get_progress_stats(self, user_id: Optional[str] = None) -> Dict:
+        """Get progress statistics for one user, or all analyses when anonymous."""
         try:
             conn = sqlite3.connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
             # Get all scores
-            cursor.execute('SELECT score FROM analyses ORDER BY timestamp ASC')
+            if user_id:
+                cursor.execute('''
+                    SELECT score FROM analyses
+                    WHERE user_id = ? AND feedback NOT LIKE '%AI analysis unavailable%'
+                    ORDER BY timestamp ASC
+                ''', (user_id,))
+            else:
+                cursor.execute('''
+                    SELECT score FROM analyses
+                    WHERE feedback NOT LIKE '%AI analysis unavailable%'
+                    ORDER BY timestamp ASC
+                ''')
             rows = cursor.fetchall()
             conn.close()
             
@@ -452,15 +468,15 @@ class Database:
             cursor = conn.cursor()
             
             # Total analyses
-            cursor.execute('SELECT COUNT(*) as count FROM analyses')
+            cursor.execute("SELECT COUNT(*) as count FROM analyses WHERE feedback NOT LIKE '%AI analysis unavailable%'")
             total = cursor.fetchone()[0]
             
             # Average score
-            cursor.execute('SELECT AVG(score) as avg_score FROM analyses')
+            cursor.execute("SELECT AVG(score) as avg_score FROM analyses WHERE feedback NOT LIKE '%AI analysis unavailable%'")
             avg = cursor.fetchone()[0] or 0
             
             # Best score
-            cursor.execute('SELECT MAX(score) as max_score FROM analyses')
+            cursor.execute("SELECT MAX(score) as max_score FROM analyses WHERE feedback NOT LIKE '%AI analysis unavailable%'")
             best = cursor.fetchone()[0] or 0
             
             # Feedback counts
@@ -471,6 +487,8 @@ class Database:
                     SUM(learning_count) as total_learning,
                     SUM(good_count) as total_good
                 FROM feedback_cache
+                JOIN analyses ON analyses.id = feedback_cache.analysis_id
+                WHERE analyses.feedback NOT LIKE '%AI analysis unavailable%'
             ''')
             feedback_row = cursor.fetchone()
             

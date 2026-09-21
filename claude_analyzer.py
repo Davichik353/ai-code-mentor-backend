@@ -94,6 +94,9 @@ Return ONLY valid JSON (no markdown, no code blocks, no backticks) with this exa
   ],
   "good": [
     {"practice": "...", "explanation": "..."}
+    ],
+    "mentor_hints": [
+        {"hint": "A short question that helps the student notice the issue", "guide": "A concise learning direction, without giving the full answer"}
   ]
 }
 
@@ -102,6 +105,8 @@ Guidelines:
 - Improvements: Bad practices, performance, readability
 - Learning: Concepts to study, patterns to learn
 - Good: Praise correct implementations
+- mentor_hints: Return 3 progressive, code-specific questions based on the actual issues above. Start with noticing the issue, then ask what could happen, then point toward the relevant concept. Never invent an issue that is not present in the code.
+- Keep mentor_hints in the same language as the user's code comments when clear; otherwise use concise English.
 
 Be encouraging but honest. Explain WHY, not just WHAT."""
 
@@ -184,10 +189,26 @@ Provide detailed, structured feedback. Remember: respond with ONLY the JSON obje
         Hints guide students toward the answer instead of giving it away,
         and are enriched with RAG-sourced learning resources where available.
         """
+        ai_hints = feedback.get("mentor_hints")
+        if isinstance(ai_hints, list):
+            valid_hints = [
+                {
+                    "level": "hint",
+                    "hint": str(item.get("hint", "")).strip(),
+                    "guide": str(item.get("guide", "")).strip(),
+                }
+                for item in ai_hints
+                if isinstance(item, dict) and str(item.get("hint", "")).strip()
+            ]
+            if valid_hints:
+                return valid_hints[:6]
         return self.mentor.generate_hints(feedback)
 
     def calculate_score(self, feedback: dict) -> int:
         """Calculate overall code quality score (0-100)"""
+        if feedback.get("analysis_available") is False:
+            return 0
+
         score = 100
 
         critical_count = len(feedback.get("critical", []))
@@ -223,21 +244,14 @@ Provide detailed, structured feedback. Remember: respond with ONLY the JSON obje
     def _create_default_feedback(self, code: str) -> dict:
         """Fallback feedback if the API is unavailable (no key, quota, etc.)"""
         return {
+            "analysis_available": False,
             "summary": "Unable to analyze code at the moment (AI service unavailable)",
             "critical": [],
-            "improvements": [
-                {
-                    "issue": "AI analysis unavailable",
-                    "explanation": "Could not reach the analysis service",
-                    "why": "Check GOOGLE_API_KEY in .env and your API quota",
-                    "suggestion": "Verify your API key is set and valid"
-                }
-            ],
+            "improvements": [],
             "learning": [],
-            "good": [
-                {
-                    "practice": "Code submission",
-                    "explanation": "Successfully submitted code for analysis"
-                }
-            ]
+            "good": [],
+            "mentor_hints": [{
+                "hint": "AI analysis is temporarily unavailable. What part of this code would you like to verify first?",
+                "guide": "Check the analysis service configuration and try again for code-specific guidance."
+            }]
         }
