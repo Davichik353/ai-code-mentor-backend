@@ -708,14 +708,11 @@
                 <div class="nav-item active" onclick="showDashboard()">
                     <i class="fas fa-chart-line"></i> Dashboard
                 </div>
+                <div class="nav-item" onclick="clearCode()">
+                    <i class="fas fa-plus"></i> New Analysis
+                </div>
                 <div class="nav-item" onclick="loadHistory()">
                     <i class="fas fa-history"></i> History
-                </div>
-                <div class="nav-item" onclick="showSettings()">
-                    <i class="fas fa-cog"></i> Settings
-                </div>
-                <div class="nav-item" onclick="showInvestorDemo()">
-                    <i class="fas fa-rocket"></i> Investor Demo
                 </div>
                 <div class="nav-item" onclick="showProgress()">
                     <i class="fas fa-chart-bar"></i> Progress
@@ -726,8 +723,14 @@
                 <div class="nav-item" onclick="showSavedSnippets()">
                     <i class="fas fa-bookmark"></i> Saved Snippets
                 </div>
+                <div class="nav-item" onclick="showSettings()">
+                    <i class="fas fa-cog"></i> Settings
+                </div>
                 <div class="nav-item" onclick="showApiDocs()">
                     <i class="fas fa-file-lines"></i> API Docs
+                </div>
+                <div class="nav-item" onclick="showInvestorDemo()">
+                    <i class="fas fa-rocket"></i> Investor Demo
                 </div>
             </nav>
             <div class="profile-card">
@@ -851,28 +854,43 @@ print(user)
                             <span style="height:62%"></span><span style="height:68%"></span><span style="height:74%"></span>
                             <span style="height:82%"></span><span style="height:91%"></span><span style="height:97%"></span>
                         </div>
-                        <div class="progress-summary"><strong id="progressAverage">100</strong><small>Analyses</small><b id="progressCount">24</b><button class="btn-primary" onclick="showProgress()">View Progress →</button></div>
-                            <div class="score-breakdown">
-                                <span><b id="railCritical">2</b><em>Critical</em></span>
-                                <span><b id="railImprovement">3</b><em>Improvement</em></span>
-                                <span><b id="railLearning">2</b><em>Learning</em></span>
-                                <span><b id="railGood">4</b><em>Good</em></span>
-                            </div>
+                        <div class="progress-summary">
+                            <strong id="progressAverage">68</strong><small>Average Score</small>
+                            <b id="progressCount">24</b><small>Analyses</small>
+                            <button class="btn-primary" onclick="showProgress()">View Progress →</button>
                         </div>
-                        <div class="rail-card mentor-card">
-                            <div class="rail-title">Mentor Mode <span class="step-pill">Step 1 of 3</span></div>
-                            <div id="railHint" class="rail-hint">Заметь ли ты, что ты напрямую вставляешь user_input в SQL-запрос? Подумай об обезопасности данных.</div>
-                            <div class="hint-actions"><button class="btn-secondary" onclick="changeHint(-1)">← Previous Hint</button><button class="btn-primary" onclick="changeHint(1)">Next Hint →</button></div>
-                            <small class="hint-footer">💡 Hints help you find the solution yourself!</small>
-                        </div>
-                        <div class="rail-card recent-card">
-                            <div class="rail-title">Recent Analyses <button class="view-all" onclick="loadHistory()">View all</button></div>
-                            <div class="recent-item"><span class="file-icon">🐍</span><div><b>user_auth.py</b><small>Score: 78/100</small></div><span class="status-good">Good</span></div>
-                            <div class="recent-item"><span class="file-icon">🐍</span><div><b>data_processing.py</b><small>Score: 85/100</small></div><span class="status-good">Good</span></div>
-                            <div class="recent-item"><span class="file-icon">🌐</span><div><b>web_scraper.py</b><small>Score: 45/100</small></div><span class="status-bad">Bad</span></div>
-                        </div>
-                    </aside>
+                    </div>
                 </div>
+                </div>
+
+                <aside class="right-rail">
+                    <div class="rail-card score-card">
+                        <div class="rail-title">Overall Score</div>
+                        <div class="score-ring">
+                            <strong id="railScore">62</strong>
+                            <small>/ 100</small>
+                        </div>
+                        <p id="railFeedback">Your code is good, but there's room for improvement!</p>
+                        <div class="score-breakdown">
+                            <span><b id="railCritical">2</b><em>Critical</em></span>
+                            <span><b id="railImprovement">3</b><em>Improvement</em></span>
+                            <span><b id="railLearning">2</b><em>Learning</em></span>
+                            <span><b id="railGood">4</b><em>Good</em></span>
+                        </div>
+                    </div>
+                    <div class="rail-card mentor-card">
+                        <div class="rail-title">Mentor Mode <span class="step-pill">Step 1 of 3</span></div>
+                        <div id="railHint" class="rail-hint">Заметил ли ты, что ты напрямую вставляешь user_input в SQL-запрос? Подумай об безопасности данных.</div>
+                        <div class="hint-actions"><button class="btn-secondary" onclick="changeHint(-1)">← Previous Hint</button><button class="btn-primary" onclick="changeHint(1)">Next Hint →</button></div>
+                        <small class="hint-footer">💡 Hints help you find the solution yourself!</small>
+                    </div>
+                    <div class="rail-card recent-card">
+                        <div class="rail-title">Recent Analyses <button class="view-all" onclick="loadHistory()">View all</button></div>
+                        <div class="recent-item"><span class="file-icon">🐍</span><div><b>user_auth.py</b><small>Score: 78/100 · 2 hours ago</small></div><span class="status-good">Good</span></div>
+                        <div class="recent-item"><span class="file-icon">🐍</span><div><b>data_processing.py</b><small>Score: 85/100 · 1 day ago</small></div><span class="status-good">Good</span></div>
+                        <div class="recent-item"><span class="file-icon">🌐</span><div><b>web_scraper.py</b><small>Score: 45/100 · 3 days ago</small></div><span class="status-bad">Bad</span></div>
+                    </div>
+                </aside>
             </div>
         </div>
     </div>
@@ -952,10 +970,15 @@ print(user)
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        function showAuthOverlay() {
+            const overlay = document.getElementById('authOverlay');
+            if (overlay) overlay.style.display = 'flex';
+        }
+
+        function hideAuthOverlay() {
             const overlay = document.getElementById('authOverlay');
             if (overlay) overlay.style.display = 'none';
-        });
+        }
 
         const API_URL = (() => {
             const host = location.hostname;
@@ -1011,7 +1034,7 @@ print(user)
                 if (!response.ok) throw new Error(data.detail || 'Authentication failed');
                 if (authMode === 'register' && data.access_token && !data.verification_required) {
                     localStorage.setItem('mentor_token', data.access_token);
-                    document.getElementById('authOverlay').style.display = 'none';
+                    hideAuthOverlay();
                     const user = data.user || { display_name: email.split('@')[0], email };
                     document.getElementById('userEmail').textContent = (user.display_name || user.email) || email;
                     document.getElementById('userName').textContent = user.display_name || email.split('@')[0];
@@ -1032,7 +1055,7 @@ print(user)
                     error.style.display = 'block';
                 } else {
                     localStorage.setItem('mentor_token', data.access_token);
-                    document.getElementById('authOverlay').style.display = 'none';
+                    hideAuthOverlay();
                     const user = data.user || {};
                     document.getElementById('userEmail').textContent = user.display_name || user.email;
                     document.getElementById('userName').textContent = user.display_name || user.email.split('@')[0];
@@ -1056,7 +1079,7 @@ print(user)
             const data = await response.json();
             if (!response.ok) { document.getElementById('authError').textContent = data.detail || 'Verification failed'; return; }
             localStorage.setItem('mentor_token', data.access_token);
-            document.getElementById('authOverlay').style.display = 'none';
+            hideAuthOverlay();
             document.getElementById('userEmail').textContent = data.user.display_name || data.user.email;
         }
 
@@ -1383,7 +1406,7 @@ def find_user(user_id):
             return '🔴 Critical Issues';
         }
 
-        // Test connection on load
+        // Auth gate + backend ping on load
         window.addEventListener('load', async () => {
             const token = localStorage.getItem('mentor_token');
             if (token) {
@@ -1391,7 +1414,7 @@ def find_user(user_id):
                     const me = await fetch(`${API_URL}/auth/me`, { headers: authHeaders() });
                     if (me.ok) {
                         const data = await me.json();
-                        document.getElementById('authOverlay').style.display = 'none';
+                        hideAuthOverlay();
                         document.getElementById('userEmail').textContent = data.display_name || data.email;
                         document.getElementById('userName').textContent = data.display_name || data.email.split('@')[0];
                         if (data.level) {
@@ -1403,8 +1426,16 @@ def find_user(user_id):
                             const xpFill = document.querySelector('.xp-track span');
                             if (xpFill) xpFill.style.width = `${xpPercent}%`;
                         }
-                    } else localStorage.removeItem('mentor_token');
-                } catch (e) { console.warn('Authentication check failed', e); }
+                    } else {
+                        localStorage.removeItem('mentor_token');
+                        showAuthOverlay();
+                    }
+                } catch (e) {
+                    console.warn('Authentication check failed', e);
+                    showAuthOverlay();
+                }
+            } else {
+                showAuthOverlay();
             }
             try {
                 const response = await fetch(`${API_URL}/`);
