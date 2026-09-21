@@ -103,9 +103,9 @@ class CacheKey:
     """Helper for generating consistent cache keys."""
 
     @staticmethod
-    def progress_stats() -> str:
-        """Cache key for progress statistics."""
-        return "progress_stats"
+    def progress_stats(user_id: str = "public") -> str:
+        """Cache key for per-user progress statistics."""
+        return f"progress_stats:{user_id}"
 
     @staticmethod
     def overall_stats() -> str:
