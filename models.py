@@ -109,6 +109,11 @@ class UserResponse(BaseModel):
     display_name: Optional[str] = None
     created_at: str
 
+    # Gamification-style progress (computed from user's analyses)
+    level: Optional[int] = None
+    xp_current: Optional[int] = None
+    xp_needed: Optional[int] = None
+
     class Config:
         extra = "ignore"
 
