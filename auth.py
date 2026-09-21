@@ -11,17 +11,23 @@ Design choices (learned from today's deployment saga):
 import hashlib
 import hmac
 import os
+import re
 import secrets
 import time
-import re
-from typing import Optional
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 import jwt
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # Secret key for signing JWTs. In production this MUST come from an env var —
 # falls back to a random one on startup so local dev still works, but that
 # means tokens won't survive a server restart unless JWT_SECRET is set.
-JWT_SECRET = os.getenv("JWT_SECRET") or secrets.token_hex(32)
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is required")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_SECONDS = 7 * 24 * 60 * 60  # 7 days
 
@@ -61,7 +67,7 @@ def create_access_token(user_id: str, email: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def decode_access_token(token: str) -> Optional[dict]:
+def decode_access_token(token: str) -> dict | None:
     """Decode and verify a JWT. Returns the payload dict, or None if invalid/expired."""
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
