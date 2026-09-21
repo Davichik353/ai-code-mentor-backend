@@ -10,6 +10,9 @@ import os
 from dotenv import load_dotenv
 import time
 
+# Load environment variables BEFORE importing auth
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 from models import (
     CodeAnalysisRequest, CodeAnalysisResponse, AnalysisItem, FeedbackItem,
     TodoCreate, TodoUpdate, TodoItem, UserRegister, UserLogin, TokenResponse, UserResponse,
@@ -30,8 +33,6 @@ import secrets
 import smtplib
 from datetime import timedelta
 from email.message import EmailMessage
-
-load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # Initialize database and analyzer
 db = Database()
@@ -134,6 +135,7 @@ frontend_origins = {
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "https://ai-code-mentor-frontend.vercel.app",
+    "https://ai-code-mentor-frontend-iota.vercel.app",
     "https://ai-code-mentor-backend-z80q.onrender.com",
 }
 frontend_origins.update(
