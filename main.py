@@ -276,6 +276,19 @@ async def login(user: UserLogin):
 async def me(user=Depends(current_user)):
     return UserResponse(**user)
 
+@app.delete("/auth/account")
+async def delete_account(user=Depends(current_user)):
+    """Delete the authenticated account and its private analysis data."""
+    try:
+        if not db.delete_user(user["id"]):
+            raise HTTPException(status_code=404, detail="Account not found")
+        cache.delete(CacheKey.progress_stats(user["id"]))
+        return {"message": "Account deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/analyze", response_model=CodeAnalysisResponse)
 async def analyze_code(request: CodeAnalysisRequest, user=Depends(current_user)):
     """

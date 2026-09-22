@@ -181,6 +181,11 @@ class Database:
     def delete_user(self, user_id: str) -> bool:
         conn = sqlite3.connect(self.db_path)
         try:
+            conn.execute('''
+                DELETE FROM feedback_cache
+                WHERE analysis_id IN (SELECT id FROM analyses WHERE user_id = ?)
+            ''', (user_id,))
+            conn.execute("DELETE FROM analyses WHERE user_id = ?", (user_id,))
             cursor = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
             conn.commit()
             return cursor.rowcount > 0
