@@ -370,7 +370,6 @@
             font-size: 48px;
             font-weight: 700;
             background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 4px;
@@ -606,7 +605,7 @@
         .language-select { width: 130px; display: inline-block; margin: 0 0 0 8px; background: #281436; border-color: #4f2369; }
         .file-row { display: inline-flex; float: left; margin-top: 13px; }
         .file-row input { max-width: 120px; }
-        .button-group { clear: both; }
+        .button-group { clear: both; flex-wrap: wrap; }
         .button-group button { padding: 9px 11px; }
         .btn-primary { background: linear-gradient(100deg, #ef28b7, #9a20e3); }
         .btn-secondary { color: #e8a6ff; border-color: #8a3db5; }
@@ -615,6 +614,19 @@
         .results-card #resultsContainer { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
         .results-card #resultsContainer > h4, .results-card #resultsContainer > .hints-section, .results-card #resultsContainer > .score-section, .results-card #resultsContainer > .empty-state, .results-card #resultsContainer > .error-message { grid-column: 1 / -1; }
         .results-card .result-card { min-height: 142px; }
+        .results-card .result-card > button { max-width: 100%; margin-top: 8px; }
+        .snippet-actions, .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+        .snippet-actions button, .settings-actions button { flex: 1 1 140px; }
+        .settings-form { display: grid; gap: 14px; max-width: 460px; }
+        .settings-field { display: grid; gap: 6px; color: #d8c7df; font-size: 12px; }
+        .settings-field select { width: 100%; }
+        .settings-checkbox { display: flex; align-items: center; gap: 8px; color: #d8c7df; font-size: 12px; }
+        .settings-checkbox input { accent-color: var(--pink); }
+        .snippet-meta { color: #a990ad; font-size: 10px; margin-top: 5px; }
+        .account-details { display: grid; gap: 7px; margin: 14px 0 18px; max-width: 460px; text-align: left; }
+        .account-detail { display: flex; justify-content: space-between; gap: 16px; padding: 9px 11px; border: 1px solid rgba(147, 104, 177, 0.25); border-radius: 7px; color: #d8c7df; font-size: 12px; }
+        .account-detail span:last-child { color: #a990ad; text-align: right; overflow-wrap: anywhere; }
+        .danger-button { color: #ffb5c1; border-color: rgba(214, 75, 104, .65); }
         .card-title { color: #f9edff; }
         .results-container { max-height: none; }
         .right-rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -657,7 +669,7 @@
         .step-pill { background: #f1cfe6; color: #9e3289 !important; padding: 5px 8px; border-radius: 6px; font-size: 10px; }
         .rail-hint { background: #fff8fb; border: 1px solid #efdce9; border-radius: 7px; padding: 13px; color: #4d3850; font-size: 12px; line-height: 1.45; min-height: 78px; }
         .hint-actions { display: flex; gap: 7px; margin-top: 10px; }
-        .hint-actions button { font-size: 10px; padding: 8px 6px; color: #8d438a; border-color: #d99bca; }
+        .hint-actions button { flex: 1 1 0; min-width: 0; font-size: 10px; padding: 8px 6px; color: #8d438a; border-color: #d99bca; }
         .hint-actions .btn-primary { color: #fff; }
         .hint-footer { display: block; color: #9f7896; margin-top: 11px; }
         .view-all { border: 0; background: none; color: #b32993; font-size: 11px; width: auto; padding: 0; }
@@ -665,6 +677,7 @@
         .recent-item > div { flex: 1; }
         .recent-item b, .recent-item small { display: block; }
         .recent-item small { color: #8d788c; margin-top: 3px; }
+        .recent-item button { padding: 5px 8px; font-size: 10px; }
         .file-icon { font-size: 17px; }
         .status-good, .status-bad { padding: 4px 7px; border-radius: 5px; font-size: 9px; }
         .status-good { background: #c8e9ca; color: #33853d; }
@@ -674,10 +687,10 @@
         .progress-heading { display: flex; justify-content: space-between; align-items: center; }
         .progress-heading .card-title { margin: 0; }
         .progress-heading > span { color: #ad91af; font-size: 10px; }
-        .progress-body { display: flex; gap: 20px; align-items: center; }
+        .progress-body { display: flex; gap: 20px; align-items: center; min-width: 0; }
         .progress-chart { height: 92px; flex: 1; display: flex; align-items: end; gap: 8px; padding: 8px 4px 0; border-bottom: 1px solid #4b265d; background: repeating-linear-gradient(to bottom, transparent 0, transparent 22px, rgba(112, 57, 126, .24) 23px); }
         .progress-chart span { flex: 1; min-width: 8px; border-radius: 5px 5px 0 0; background: linear-gradient(180deg, #ee47c2, #8627d9); box-shadow: 0 0 10px rgba(224, 51, 186, .35); }
-        .progress-summary { min-width: 116px; display: grid; gap: 3px; color: #f1e6f4; }
+        .progress-summary { width: 116px; min-width: 0; display: grid; gap: 3px; color: #f1e6f4; }
         .progress-summary strong { font-size: 22px; }
         .progress-summary small { color: #ad91af; font-size: 10px; }
         .progress-summary b { font-size: 18px; }
@@ -688,7 +701,8 @@
         .light-mode .card, .light-mode .code-card { background: #fffaff; border-color: #e4cce7; }
         .light-mode textarea { background: #fff; color: #72208d; }
         @media (max-width: 1050px) { .content { grid-template-columns: minmax(0, 1fr); } .right-rail { display: grid; grid-template-columns: repeat(3, 1fr); } .results-card #resultsContainer { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (max-width: 768px) { .topbar { align-items: flex-start; gap: 10px; } .new-analysis-button { font-size: 0; } .new-analysis-button i { font-size: 13px; } .right-rail { display: flex; } .content { padding: 12px; } .sidebar { width: 100%; } .results-card #resultsContainer { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .topbar { align-items: flex-start; gap: 10px; } .new-analysis-button { font-size: 0; } .new-analysis-button i { font-size: 13px; } .right-rail { display: flex; } .content { padding: 12px; } .sidebar { width: 100%; } .results-card #resultsContainer { grid-template-columns: 1fr; } .progress-body { gap: 12px; } .progress-chart { gap: 4px; } .progress-summary { width: 92px; } }
+        @media (max-width: 460px) { .topbar-actions { gap: 6px; } .new-analysis-button { padding: 9px 11px; } .button-group { gap: 7px; } .button-group button { flex: 1 1 130px; } .progress-body { align-items: stretch; flex-direction: column; } .progress-summary { width: 100%; grid-template-columns: 1fr 1fr; align-items: center; } .progress-summary button { grid-column: 1 / -1; } }
     </style>
 </head>
 <body>
@@ -726,9 +740,6 @@
                 <div class="nav-item" onclick="showSettings()">
                     <i class="fas fa-cog"></i> Settings
                 </div>
-                <div class="nav-item" onclick="showApiDocs()">
-                    <i class="fas fa-file-lines"></i> API Docs
-                </div>
                 <div class="nav-item" onclick="showInvestorDemo()">
                     <i class="fas fa-rocket"></i> Investor Demo
                 </div>
@@ -736,7 +747,7 @@
             <div class="profile-card">
                 <div class="profile-head"><span class="profile-avatar">D</span><span><b id="userName">Davichik</b><small>Student</small></span></div>
                 <p>Keep coding, keep growing! 🚀</p>
-                <div class="level-row"><span>Level 1</span><span>0 / 2,000 XP</span></div>
+                <div class="level-row"><span id="userLevel">Level -</span><span id="userXp">0 / 0 XP</span></div>
                 <div class="xp-track"><span></span></div>
                 <span id="userEmail" class="profile-email">Not signed in</span>
                 <button class="btn-secondary" style="margin-top:8px;width:100%;" onclick="logout()">Sign out</button>
@@ -751,7 +762,7 @@
                     <p style="color: #8b8f9e; margin-top: 4px; font-size: 13px;">Paste your code below and get AI-powered feedback</p>
                 </div>
                 <div class="topbar-actions">
-                    <button class="theme-button" onclick="document.body.classList.toggle('light-mode')" aria-label="Toggle theme">☾</button>
+                    <button class="theme-button" onclick="toggleTheme()" aria-label="Toggle theme">☾</button>
                     <button class="btn-primary new-analysis-button" onclick="clearCode()"><i class="fas fa-plus"></i> New Analysis</button>
                 </div>
             </div>
@@ -850,9 +861,6 @@ print(user)
                     <div class="progress-heading"><h3 class="card-title">Your Progress</h3><span>Average Score</span></div>
                     <div class="progress-body">
                         <div class="progress-chart" aria-label="Progress chart">
-                            <span style="height:24%"></span><span style="height:39%"></span><span style="height:50%"></span>
-                            <span style="height:62%"></span><span style="height:68%"></span><span style="height:74%"></span>
-                            <span style="height:82%"></span><span style="height:91%"></span><span style="height:97%"></span>
                         </div>
                         <div class="progress-summary">
                             <strong id="progressAverage">68</strong><small>Average Score</small>
@@ -886,9 +894,7 @@ print(user)
                     </div>
                     <div class="rail-card recent-card">
                         <div class="rail-title">Recent Analyses <button class="view-all" onclick="loadHistory()">View all</button></div>
-                        <div class="recent-item"><span class="file-icon">🐍</span><div><b>user_auth.py</b><small>Score: 78/100 · 2 hours ago</small></div><span class="status-good">Good</span></div>
-                        <div class="recent-item"><span class="file-icon">🐍</span><div><b>data_processing.py</b><small>Score: 85/100 · 1 day ago</small></div><span class="status-good">Good</span></div>
-                        <div class="recent-item"><span class="file-icon">🌐</span><div><b>web_scraper.py</b><small>Score: 45/100 · 3 days ago</small></div><span class="status-bad">Bad</span></div>
+                        <div class="recent-item"><div><small>Loading your analyses...</small></div></div>
                     </div>
                 </aside>
             </div>
@@ -898,14 +904,14 @@ print(user)
     <section id="investorPanel" class="investor-panel">
         <div class="investor-inner">
             <button class="btn-secondary" style="max-width:160px;margin-bottom:20px;" onclick="closeInvestorDemo()">
-                <i class="fas fa-arrow-left"></i> Back to app
+                <i class="fas fa-arrow-left"></i> Назад в приложение
             </button>
             <div class="investor-hero">
                 <h2>AI Code Mentor</h2>
                 <p>Интерактивный AI-наставник, который помогает разработчику быстро найти ошибку, понять причину и изучить решение через релевантные материалы.</p>
             </div>
             <div class="investor-grid">
-                <div class="investor-stat"><strong>Any language</strong><span>Поддержка популярных языков программирования</span></div>
+                <div class="investor-stat"><strong>Любой язык</strong><span>Поддержка популярных языков программирования</span></div>
                 <div class="investor-stat"><strong>3 шага</strong><span>Ошибка → объяснение → следующий шаг обучения</span></div>
                 <div class="investor-stat"><strong>24/7</strong><span>Самообслуживание без ожидания ментора</span></div>
             </div>
@@ -923,7 +929,7 @@ print(user)
                     <ul class="investor-list">
                         <li>Анализирует код и находит критические проблемы.</li>
                         <li>Объясняет «почему», а не только «что исправить».</li>
-                        <li>Даёт progressive hints и ссылки на YouTube-обучение.</li>
+                        <li>Даёт пошаговые подсказки и ссылки на YouTube-обучение.</li>
                     </ul>
                 </div>
                 <div class="card">
@@ -962,7 +968,7 @@ print(user)
                     <i id="togglePasswordIcon" class="fas fa-eye"></i>
                 </button>
             </div>
-            <input id="authCode" inputmode="numeric" maxlength="6" placeholder="Email verification code" style="display:none">
+            <input id="authCode" inputmode="text" maxlength="64" placeholder="Email verification code" style="display:none">
             <button class="btn-primary" style="width:100%;" onclick="submitAuth()" id="authSubmit">Register</button>
             <div class="auth-switch" onclick="toggleAuthMode()" id="authSwitch">Already have an account? Sign in</div>
             <div id="authError" class="error-message" style="display:none;margin-top:12px;"></div>
@@ -992,9 +998,54 @@ print(user)
         let currentHints = [];
         let currentHintIndex = 0;
 
+        function readStoredJson(key, fallback) {
+            try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+            catch (error) { return fallback; }
+        }
+
+        function getSettings() {
+            return { theme: 'dark', defaultLanguage: '', autoSave: false, ...readStoredJson('mentor_settings', {}) };
+        }
+
+        function applySettings() {
+            const settings = getSettings();
+            document.body.classList.toggle('light-mode', settings.theme === 'light');
+            const language = document.getElementById('languageSelect');
+            if (language && settings.defaultLanguage) language.value = settings.defaultLanguage;
+        }
+
+        function toggleTheme() {
+            const settings = getSettings();
+            settings.theme = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+            localStorage.setItem('mentor_settings', JSON.stringify(settings));
+            applySettings();
+        }
+
         function authHeaders() {
             const token = localStorage.getItem('mentor_token');
             return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+
+        function updateProfile(user) {
+            if (!user) return;
+            document.getElementById('userEmail').textContent = user.display_name || user.email || 'Not signed in';
+            document.getElementById('userName').textContent = user.display_name || user.email?.split('@')[0] || 'Student';
+            if (user.level == null) return;
+            const xpCurrent = user.xp_current || 0;
+            const xpNeeded = user.xp_needed || 1;
+            document.getElementById('userLevel').textContent = `Level ${user.level}`;
+            document.getElementById('userXp').textContent = `${xpCurrent} / ${xpNeeded} XP`;
+            const xpFill = document.querySelector('.xp-track span');
+            if (xpFill) xpFill.style.width = `${Math.min(100, (xpCurrent / xpNeeded) * 100)}%`;
+        }
+
+        async function refreshUserProfile() {
+            try {
+                const response = await fetch(`${API_URL}/auth/me`, { headers: authHeaders() });
+                if (response.ok) updateProfile(await response.json());
+            } catch (error) {
+                console.warn('Unable to refresh profile:', error);
+            }
         }
 
         function togglePasswordVisibility(inputId, iconId) {
@@ -1014,18 +1065,33 @@ print(user)
 
         function toggleAuthMode() {
             authMode = authMode === 'register' ? 'login' : 'register';
+            const authSubmit = document.getElementById('authSubmit');
+            const authName = document.getElementById('authName');
+            const authCode = document.getElementById('authCode');
+            const authError = document.getElementById('authError');
+
             document.getElementById('authTitle').textContent = authMode === 'register' ? 'Create your account' : 'Welcome back';
-            document.getElementById('authSubmit').textContent = authMode === 'register' ? 'Register' : 'Sign in';
-            document.getElementById('authName').style.display = authMode === 'register' ? 'block' : 'none';
+            authSubmit.textContent = authMode === 'register' ? 'Register' : 'Sign in';
+            authSubmit.onclick = submitAuth;
+            authName.style.display = authMode === 'register' ? 'block' : 'none';
+            authCode.style.display = 'none';
+            authError.style.display = 'none';
+            authError.textContent = '';
             document.getElementById('authSwitch').textContent = authMode === 'register'
                 ? 'Already have an account? Sign in' : 'No account yet? Register';
         }
 
         async function submitAuth() {
+            const btn = document.getElementById('authSubmit');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = authMode === 'register' ? 'Registering...' : 'Signing in...';
+            document.getElementById('authError').style.display = 'none';
             const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPassword').value;
             const error = document.getElementById('authError');
-            if (!email || password.length < 10) { error.textContent = 'Enter a valid email and a strong password.'; error.style.display = 'block'; return; }
+            if (!email) { error.textContent = 'Enter your email address.'; error.style.display = 'block'; btn.disabled = false; btn.textContent = originalText; return; }
+            if (authMode === 'register' && password.length < 10) { error.textContent = 'Password must be at least 10 characters.'; error.style.display = 'block'; btn.disabled = false; btn.textContent = originalText; return; }
             try {
                 const body = { email, password };
                 if (authMode === 'register') body.display_name = document.getElementById('authName').value.trim() || null;
@@ -1051,7 +1117,7 @@ print(user)
                     document.getElementById('authCode').style.display = 'block';
                     document.getElementById('authSubmit').textContent = 'Verify email';
                     document.getElementById('authSubmit').onclick = verifyEmail;
-                    error.textContent = 'Verification code sent. Enter the 6-digit code from your email.';
+                    error.textContent = 'Verification code sent. Enter the code from your email.';
                     error.style.display = 'block';
                 } else {
                     localStorage.setItem('mentor_token', data.access_token);
@@ -1073,14 +1139,26 @@ print(user)
         }
 
         async function verifyEmail() {
-            const email = encodeURIComponent(document.getElementById('authEmail').value);
-            const code = encodeURIComponent(document.getElementById('authCode').value);
-            const response = await fetch(`${API_URL}/auth/verify-email?email=${email}&code=${code}`, { method: 'POST' });
-            const data = await response.json();
-            if (!response.ok) { document.getElementById('authError').textContent = data.detail || 'Verification failed'; return; }
-            localStorage.setItem('mentor_token', data.access_token);
-            hideAuthOverlay();
-            document.getElementById('userEmail').textContent = data.user.display_name || data.user.email;
+            const btn = document.getElementById('authSubmit');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Verifying...';
+            document.getElementById('authError').style.display = 'none';
+            try {
+                const email = encodeURIComponent(document.getElementById('authEmail').value);
+                const code = encodeURIComponent(document.getElementById('authCode').value);
+                const response = await fetch(`${API_URL}/auth/verify-email?email=${email}&code=${code}`, { method: 'POST' });
+                const data = await response.json();
+                if (!response.ok) { document.getElementById('authError').textContent = data.detail || 'Verification failed'; document.getElementById('authError').style.display = 'block'; return; }
+                localStorage.setItem('mentor_token', data.access_token);
+                hideAuthOverlay();
+                document.getElementById('userEmail').textContent = data.user.display_name || data.user.email;
+            } catch (e) {
+                document.getElementById('authError').textContent = e.message || 'Network error'; document.getElementById('authError').style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
         }
 
         function logout() { localStorage.removeItem('mentor_token'); location.reload(); }
@@ -1178,13 +1256,17 @@ def get_user(user_id):
 
                 const data = await response.json();
                 displayResults(data);
+                if (getSettings().autoSave) saveSnippetData(false);
+                refreshDashboardStats();
+                refreshStatistics();
+                refreshUserProfile();
 
             } catch (error) {
                 const msg = String(error.message || '');
                 if (msg.includes('401') || /required|expired|sign in/i.test(msg)) {
                     showError('Please sign in again.');
                 } else if (/Failed to fetch|NetworkError|Cannot connect/i.test(msg)) {
-                    showError('Cannot connect to the analysis server. Open http://localhost:8000/app after starting the backend.');
+                    showError('Cannot connect to the analysis server. Please try again in a few seconds.');
                 } else {
                     showError(msg);
                 }
@@ -1312,17 +1394,155 @@ def get_user(user_id):
                 const response = await fetch(`${API_URL}/history`, { headers: authHeaders() });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.detail || 'Unable to load history');
-                document.getElementById('resultsContainer').innerHTML = (data.analyses || []).map(item =>
-                    `<div class="result-card good"><h4 class="result-title">${escapeHtml(item.filename)} — ${item.score}/100</h4><p class="result-text">${escapeHtml(item.feedback_summary)}</p></div>`
-                ).join('') || '<div class="empty-state">No analyses yet.</div>';
+                document.getElementById('resultsContainer').innerHTML = renderHistory(data.analyses || []);
             } catch (error) {
                 showError(error.message);
             }
         }
 
+        function formatHistoryTime(timestamp) {
+            const date = new Date(timestamp);
+            if (Number.isNaN(date.getTime())) return 'Recently';
+            const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+            if (seconds < 60) return 'Just now';
+            if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)} hr ago`;
+            if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
+            return date.toLocaleDateString();
+        }
+
+        function renderHistory(analyses) {
+            if (!analyses.length) return '<div class="empty-state">No analyses yet.</div>';
+            return analyses.map(item => {
+                return `<div class="result-card ${item.score >= 70 ? 'good' : 'critical'}">
+                    <div class="result-header"><span class="result-badge badge-${item.score >= 70 ? 'good' : 'critical'}">${item.score}/100</span></div>
+                    <h4 class="result-title">${escapeHtml(item.filename || 'Untitled')}</h4>
+                    <p class="result-text">${escapeHtml(item.feedback_summary || 'No summary')}</p>
+                    <small class="hint-footer">${formatHistoryTime(item.timestamp)}</small>
+                    <button class="btn-secondary" onclick="openHistoryItem('${escapeHtml(item.id)}')">Open analysis</button>
+                </div>`;
+            }).join('');
+        }
+
+        async function openHistoryItem(analysisId) {
+            try {
+                const response = await fetch(`${API_URL}/analysis/${encodeURIComponent(analysisId)}`, { headers: authHeaders() });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Unable to open analysis');
+                selectedFilename = data.filename || 'analysis.txt';
+                document.getElementById('fileName').textContent = selectedFilename;
+                document.getElementById('editorFileLabel').textContent = selectedFilename;
+                document.getElementById('codeInput').value = data.code || '';
+                displayResults({ feedback: data.feedback || {}, score: data.score || 0, summary: data.feedback?.summary || '' });
+                document.querySelector('.code-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        async function refreshDashboardStats() {
+            try {
+                const response = await fetch(`${API_URL}/progress`, { headers: authHeaders() });
+                const data = await response.json();
+                if (!response.ok) return;
+                document.getElementById('progressAverage').textContent = data.average_score || 0;
+                document.getElementById('progressCount').textContent = data.total_analyses || 0;
+                updateProgressChart(data.score_trend || []);
+                updateRecentAnalyses();
+            } catch (error) {
+                console.warn('Unable to refresh dashboard stats:', error);
+            }
+        }
+
+        async function updateRecentAnalyses() {
+            try {
+                const response = await fetch(`${API_URL}/history?limit=3`, { headers: authHeaders() });
+                const data = await response.json();
+                if (!response.ok) return;
+                const recent = document.querySelector('.recent-card');
+                if (!recent) return;
+                const items = (data.analyses || []).map(item => `<div class="recent-item">
+                    <span class="file-icon">🐍</span><div><b>${escapeHtml(item.filename || 'Untitled')}</b><small>Score: ${item.score}/100 · ${formatHistoryTime(item.timestamp)}</small></div>
+                    <button class="btn-secondary" onclick="openHistoryItem('${escapeHtml(item.id)}')">Open</button>
+                </div>`).join('');
+                const title = recent.querySelector('.rail-title');
+                recent.innerHTML = '';
+                recent.appendChild(title);
+                recent.insertAdjacentHTML('beforeend', items || '<div class="empty-state">No analyses yet.</div>');
+            } catch (error) {
+                console.warn('Unable to refresh recent analyses:', error);
+            }
+        }
+
+        function updateProgressChart(scores) {
+            const chart = document.querySelector('.progress-chart');
+            if (!chart) return;
+            const recentScores = scores.slice(-12);
+            chart.innerHTML = recentScores.length
+                ? recentScores.map((score, index) => `<span style="height:${Math.max(4, Math.min(100, Number(score) || 0))}%" title="Analysis ${index + 1}: ${score}/100"></span>`).join('')
+                : '<small style="width:100%;align-self:center;text-align:center;color:#ad91af;font-size:10px;">No scores yet</small>';
+        }
+
         function showDashboard() { location.reload(); }
-        function showSettings() {
-            document.getElementById('resultsContainer').innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div><p>Settings are saved automatically in this browser.</p><button class="btn-secondary" onclick="logout()">Sign out</button></div>';
+        async function showSettings() {
+            const settings = getSettings();
+            const response = await fetch(`${API_URL}/auth/me`, { headers: authHeaders() });
+            if (!response.ok) { showError('Unable to load account settings.'); return; }
+            const account = await response.json();
+            const registered = account.created_at ? new Date(account.created_at).toLocaleDateString() : 'Unknown';
+            document.getElementById('resultsContainer').innerHTML = `<div class="empty-state">
+                <div class="empty-icon">⚙️</div><h3 class="card-title">Settings</h3>
+                <div class="account-details">
+                    <div class="account-detail"><span>Name</span><span>${escapeHtml(account.display_name || 'Not set')}</span></div>
+                    <div class="account-detail"><span>Email</span><span>${escapeHtml(account.email)}</span></div>
+                    <div class="account-detail"><span>Registered</span><span>${escapeHtml(registered)}</span></div>
+                </div>
+                <div class="settings-form">
+                    <label class="settings-field">Default analysis language
+                        <select id="settingsLanguage" class="language-select"><option value="">Auto-detect language</option><option>Python</option><option>JavaScript</option><option>TypeScript</option><option>Java</option><option>C++</option><option>C#</option><option>Go</option><option>Rust</option><option>PHP</option><option>Ruby</option><option>SQL</option><option>HTML</option><option>CSS</option><option>Other</option></select>
+                    </label>
+                    <label class="settings-checkbox"><input id="settingsAutoSave" type="checkbox" ${settings.autoSave ? 'checked' : ''}> Save analyzed code to snippets automatically</label>
+                </div>
+                <div class="settings-actions"><button class="btn-primary" onclick="saveSettings()">Save settings</button><button class="btn-secondary" onclick="exportAccountData()">Export history</button><button class="btn-secondary" onclick="logout()">Sign out</button><button class="btn-secondary danger-button" onclick="deleteAccount()">Delete account</button></div>
+            </div>`;
+            document.getElementById('settingsLanguage').value = settings.defaultLanguage || '';
+        }
+
+        async function exportAccountData() {
+            try {
+                const response = await fetch(`${API_URL}/history?limit=50`, { headers: authHeaders() });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Unable to export history');
+                const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), analyses: data.analyses || [] }, null, 2)], { type: 'application/json' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'ai-code-mentor-history.json';
+                link.click();
+                URL.revokeObjectURL(link.href);
+            } catch (error) { showError(error.message); }
+        }
+
+        async function deleteAccount() {
+            if (!confirm('Delete your account and all saved analyses? This cannot be undone.')) return;
+            try {
+                const response = await fetch(`${API_URL}/auth/account`, { method: 'DELETE', headers: authHeaders() });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Unable to delete account');
+                localStorage.removeItem('mentor_token');
+                localStorage.removeItem('mentor_saved_snippets');
+                localStorage.removeItem('mentor_saved_snippet');
+                location.reload();
+            } catch (error) { showError(error.message); }
+        }
+
+        function saveSettings() {
+            const settings = getSettings();
+            settings.defaultLanguage = document.getElementById('settingsLanguage').value;
+            settings.autoSave = document.getElementById('settingsAutoSave').checked;
+            localStorage.setItem('mentor_settings', JSON.stringify(settings));
+            const language = document.getElementById('languageSelect');
+            if (language) language.value = settings.defaultLanguage;
+            document.getElementById('resultsContainer').innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p>Settings saved.</p></div>';
         }
 
         function changeHint(direction) {
@@ -1342,38 +1562,75 @@ def get_user(user_id):
                 if (!response.ok) throw new Error(data.detail || 'Unable to load progress');
                 document.getElementById('progressAverage').textContent = data.average_score || 0;
                 document.getElementById('progressCount').textContent = data.total_analyses || 0;
+                updateProgressChart(data.score_trend || []);
                 document.getElementById('resultsContainer').innerHTML = `<div class="empty-state"><div class="empty-icon">📈</div><p>Average score: <strong>${data.average_score || 0}</strong><br>Total analyses: <strong>${data.total_analyses || 0}</strong></p></div>`;
             } catch (error) { showError(error.message); }
         }
 
         async function showStatistics() {
             try {
-                const response = await fetch(`${API_URL}/stats`, { headers: authHeaders() });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || 'Unable to load statistics');
-                document.getElementById('resultsContainer').innerHTML = `<div class="empty-state"><div class="empty-icon">📊</div><p>Analyses: <strong>${data.total_analyses || 0}</strong><br>Average score: <strong>${data.average_score || 0}</strong><br>Best score: <strong>${data.best_score || 0}</strong></p></div>`;
+                const data = await refreshStatistics();
+                if (!data) throw new Error('Unable to load statistics');
+                document.getElementById('resultsContainer').innerHTML = `<div class="empty-state" id="statisticsView"><div class="empty-icon">📊</div><p>Analyses: <strong id="statisticsTotal">${data.total_analyses || 0}</strong><br>Average score: <strong id="statisticsAverage">${data.average_score || 0}</strong><br>Best score: <strong id="statisticsBest">${data.best_score || 0}</strong></p></div>`;
             } catch (error) { showError(error.message); }
         }
 
-        function showSavedSnippets() {
-            const code = document.getElementById('codeInput').value.trim();
-            if (code) localStorage.setItem('mentor_saved_snippet', JSON.stringify({ filename: selectedFilename, code }));
-            const saved = JSON.parse(localStorage.getItem('mentor_saved_snippet') || 'null');
-            document.getElementById('resultsContainer').innerHTML = saved
-                ? `<div class="result-card good"><h4 class="result-title">${escapeHtml(saved.filename)}</h4><p class="result-text">Saved snippet is ready.</p><button class="btn-primary" onclick="restoreSnippet()">Open snippet</button></div>`
-                : '<div class="empty-state"><div class="empty-icon">🔖</div><p>No saved snippets yet. Enter code and open Saved Snippets to save it.</p></div>';
+        async function refreshStatistics() {
+            try {
+                const response = await fetch(`${API_URL}/stats`, { headers: authHeaders() });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Unable to load statistics');
+                const total = document.getElementById('statisticsTotal');
+                const average = document.getElementById('statisticsAverage');
+                const best = document.getElementById('statisticsBest');
+                if (total) total.textContent = data.total_analyses || 0;
+                if (average) average.textContent = data.average_score || 0;
+                if (best) best.textContent = data.best_score || 0;
+                return data;
+            } catch (error) {
+                console.warn('Unable to refresh statistics:', error);
+                return null;
+            }
         }
 
-        function restoreSnippet() {
-            const saved = JSON.parse(localStorage.getItem('mentor_saved_snippet') || 'null');
+        function showSavedSnippets() {
+            let snippets = readStoredJson('mentor_saved_snippets', []);
+            const legacy = readStoredJson('mentor_saved_snippet', null);
+            if (!snippets.length && legacy?.code) snippets = [{ ...legacy, id: Date.now(), updatedAt: Date.now() }];
+            const cards = snippets.map(snippet => `<div class="result-card good"><h4 class="result-title">${escapeHtml(snippet.filename || 'Untitled')}</h4><p class="snippet-meta">${escapeHtml(snippet.language || 'Auto-detect')} · ${formatHistoryTime(snippet.updatedAt)}</p><div class="snippet-actions"><button class="btn-primary" onclick="restoreSnippet(${snippet.id})">Open</button><button class="btn-secondary" onclick="deleteSnippet(${snippet.id})">Delete</button></div></div>`).join('');
+            document.getElementById('resultsContainer').innerHTML = `<div class="empty-state"><div class="empty-icon">🔖</div><p>${snippets.length ? 'Your saved code snippets' : 'No saved snippets yet.'}</p><div class="snippet-actions"><button class="btn-primary" onclick="saveCurrentSnippet()">Save current code</button></div></div>${cards}`;
+        }
+
+        function saveCurrentSnippet() {
+            const code = document.getElementById('codeInput').value.trim();
+            if (!code) { showError('Enter code before saving a snippet.'); return; }
+            saveSnippetData(true);
+        }
+
+        function saveSnippetData(refreshView) {
+            const code = document.getElementById('codeInput').value.trim();
+            if (!code) return;
+            const snippets = readStoredJson('mentor_saved_snippets', []).filter(item => item.filename !== selectedFilename);
+            snippets.unshift({ id: Date.now(), filename: selectedFilename, language: document.getElementById('languageSelect').value || 'Auto-detect', code, updatedAt: Date.now() });
+            localStorage.setItem('mentor_saved_snippets', JSON.stringify(snippets.slice(0, 20)));
+            if (refreshView) showSavedSnippets();
+        }
+
+        function restoreSnippet(snippetId) {
+            const snippets = readStoredJson('mentor_saved_snippets', []);
+            const saved = snippets.find(item => item.id === snippetId) || readStoredJson('mentor_saved_snippet', null);
             if (!saved) return;
-            selectedFilename = saved.filename;
-            document.getElementById('codeInput').value = saved.code;
+            selectedFilename = saved.filename || 'analysis.txt';
+            document.getElementById('codeInput').value = saved.code || '';
+            document.getElementById('languageSelect').value = saved.language === 'Auto-detect' ? '' : (saved.language || '');
+            document.getElementById('fileName').textContent = selectedFilename;
             document.getElementById('editorFileLabel').textContent = saved.filename;
         }
 
-        function showApiDocs() {
-            window.open(`${API_URL || location.origin}/docs`, '_blank', 'noopener');
+        function deleteSnippet(snippetId) {
+            const snippets = readStoredJson('mentor_saved_snippets', []).filter(item => item.id !== snippetId);
+            localStorage.setItem('mentor_saved_snippets', JSON.stringify(snippets));
+            showSavedSnippets();
         }
 
         function showInvestorDemo() {
@@ -1408,6 +1665,7 @@ def find_user(user_id):
 
         // Auth gate + backend ping on load
         window.addEventListener('load', async () => {
+            applySettings();
             const token = localStorage.getItem('mentor_token');
             if (token) {
                 try {
@@ -1437,6 +1695,7 @@ def find_user(user_id):
             } else {
                 showAuthOverlay();
             }
+            if (localStorage.getItem('mentor_token')) refreshDashboardStats();
             try {
                 const response = await fetch(`${API_URL}/`);
                 if (!response.ok) {
