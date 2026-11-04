@@ -133,7 +133,7 @@ Provide detailed, structured feedback. Remember: respond with ONLY the JSON obje
                 continue
             print(f"[claude_analyzer] Trying model: {name} ...")
             try:
-                response = client.models.generate_content(
+                response = await client.aio.models.generate_content(
                     model=name,
                     contents=full_prompt,
                     config=genai_types.GenerateContentConfig(

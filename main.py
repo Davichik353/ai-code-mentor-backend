@@ -20,12 +20,13 @@ from models import (
 )
 from claude_analyzer import CodeAnalyzer
 from database import Database
+from authorship import inspect_authorship
 from auth import (
     create_access_token, decode_access_token, hash_password, is_valid_email,
     verify_password, is_disposable_email, is_strong_password
 )
 from cache import get_cache, CacheKey
-from performance import get_rate_limiter, get_metrics
+from performance import get_rate_limiter, get_metrics, RateLimiter
 from migrations import run_migrations
 from health import get_health_checker
 import hashlib
@@ -44,6 +45,7 @@ registration_attempts = {}
 cache = get_cache()
 rate_limiter = get_rate_limiter()
 metrics = get_metrics()
+analysis_limiter = RateLimiter(requests_per_minute=5, requests_per_hour=60)
 LANGUAGE_BY_EXTENSION = {
     ".py": "Python", ".js": "JavaScript", ".jsx": "JavaScript/JSX", ".ts": "TypeScript",
     ".tsx": "TypeScript/TSX", ".java": "Java", ".c": "C", ".h": "C", ".cpp": "C++",
@@ -99,7 +101,7 @@ async def lifespan(app: FastAPI):
 
     # Run database migrations for optimization
     print("[startup] Running database optimizations...")
-    run_migrations()
+    run_migrations(db.db_path)
 
     # Clean up old cache entries and metrics
     print("[startup] Starting cache and metrics cleanup...")
@@ -289,11 +291,20 @@ async def delete_account(user=Depends(current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/authorship")
+async def authorship_check(request: CodeAnalysisRequest, user=Depends(current_user)):
+    """Inspect explicit provenance disclosures; does not establish authorship."""
+    return inspect_authorship(request.code, request.filename or "code.py", request.language or "")
+
 @app.post("/analyze", response_model=CodeAnalysisResponse)
 async def analyze_code(request: CodeAnalysisRequest, user=Depends(current_user)):
     """
     Analyze Python code and return feedback
     """
+    allowed, limits = analysis_limiter.is_allowed(user["id"])
+    if not allowed:
+        raise HTTPException(status_code=429, detail="Analysis limit reached. Please try again later.",
+                            headers={"Retry-After": str(limits["retry_after"])})
     try:
         # Validate code
         if not request.code or len(request.code.strip()) < 5:
@@ -316,6 +327,10 @@ async def analyze_code(request: CodeAnalysisRequest, user=Depends(current_user))
                 detail=analysis_result.get("summary", "AI analysis service is unavailable")
             )
         
+        analysis_result["authorship"] = inspect_authorship(
+            request.code, request.filename or "code.py", language
+        )
+
         # Calculate score
         score = analyzer.calculate_score(analysis_result)
         
@@ -429,6 +444,7 @@ async def delete_analysis(analysis_id: str, user=Depends(current_user)):
         success = db.delete_analysis(analysis_id, user_id=user["id"])
         if not success:
             raise HTTPException(status_code=404, detail="Analysis not found")
+        cache.delete(CacheKey.progress_stats(user["id"]))
         return {"message": "Analysis deleted successfully"}
     except HTTPException:
         raise
@@ -436,12 +452,12 @@ async def delete_analysis(analysis_id: str, user=Depends(current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/stats")
-async def get_stats():
+async def get_stats(user=Depends(current_user)):
     """
     Get overall statistics
     """
     try:
-        stats = db.get_stats()
+        stats = db.get_stats(user["id"])
         return stats
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -450,7 +466,7 @@ async def get_stats():
 async def get_todos(status: str = Query(default="all", pattern="^(all|active|completed)$"), user=Depends(current_user)):
     """Get the todo list, optionally filtered by completion status."""
     try:
-        return db.get_todos(None if status == "all" else status)
+        return db.get_todos(user["id"], None if status == "all" else status)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -460,7 +476,7 @@ async def create_todo(todo: TodoCreate, user=Depends(current_user)):
     try:
         if not todo.title.strip():
             raise HTTPException(status_code=400, detail="Title cannot be empty")
-        return db.create_todo(todo.title, todo.description)
+        return db.create_todo(user["id"], todo.title, todo.description)
     except HTTPException:
         raise
     except Exception as e:
@@ -472,7 +488,7 @@ async def update_todo(todo_id: str, todo: TodoUpdate, user=Depends(current_user)
     try:
         if todo.title is not None and not todo.title.strip():
             raise HTTPException(status_code=400, detail="Title cannot be empty")
-        updated = db.update_todo(todo_id, todo.title, todo.description, todo.completed)
+        updated = db.update_todo(user["id"], todo_id, todo.title, todo.description, todo.completed)
         if not updated:
             raise HTTPException(status_code=404, detail="Todo not found")
         return updated
@@ -485,7 +501,7 @@ async def update_todo(todo_id: str, todo: TodoUpdate, user=Depends(current_user)
 async def delete_todo(todo_id: str, user=Depends(current_user)):
     """Delete a todo item."""
     try:
-        if not db.delete_todo(todo_id):
+        if not db.delete_todo(user["id"], todo_id):
             raise HTTPException(status_code=404, detail="Todo not found")
         return {"message": "Todo deleted successfully"}
     except HTTPException:

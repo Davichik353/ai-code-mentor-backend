@@ -83,7 +83,6 @@ class HealthChecker:
                 # Quick query to test connectivity
                 cursor.execute("SELECT COUNT(*) FROM users")
                 cursor.fetchone()
-                conn.close()
 
             response_time = (time.time() - start) * 1000
             return {

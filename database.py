@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 import json
 import os
 from datetime import datetime
@@ -6,8 +7,10 @@ from typing import List, Optional, Dict
 import uuid
 
 class Database:
-    def __init__(self, db_path: str = "code_mentor.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: Optional[str] = None):
+        self.db_path = db_path or os.getenv("DATABASE_PATH", "code_mentor.db")
+        parent = os.path.dirname(os.path.abspath(self.db_path))
+        os.makedirs(parent, exist_ok=True)
         self.connection = None
     
     def init_db(self):
@@ -84,6 +87,11 @@ class Database:
                 )
             ''')
             
+            cursor.execute("PRAGMA table_info(todos)")
+            if "user_id" not in {row[1] for row in cursor.fetchall()}:
+                # Legacy tasks have no provable owner and remain inaccessible.
+                cursor.execute("ALTER TABLE todos ADD COLUMN user_id TEXT REFERENCES users(id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_user_id ON todos(user_id)")
             conn.commit()
             conn.close()
             print("Database initialized successfully")
@@ -185,6 +193,7 @@ class Database:
                 DELETE FROM feedback_cache
                 WHERE analysis_id IN (SELECT id FROM analyses WHERE user_id = ?)
             ''', (user_id,))
+            conn.execute("DELETE FROM todos WHERE user_id = ?", (user_id,))
             conn.execute("DELETE FROM analyses WHERE user_id = ?", (user_id,))
             cursor = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
             conn.commit()
@@ -324,78 +333,52 @@ class Database:
             print(f"Error getting history: {e}")
             return []
 
-    def get_todos(self, status: Optional[str] = None) -> List[Dict]:
-        """Get todos, optionally filtered by active or completed status."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            query = "SELECT * FROM todos"
-            params = []
+    def get_todos(self, user_id: str, status: Optional[str] = None) -> List[Dict]:
+        with closing(sqlite3.connect(self.db_path)) as conn, conn:
+            conn.row_factory = sqlite3.Row
+            query = "SELECT * FROM todos WHERE user_id = ?"
+            params = [user_id]
             if status in ("active", "completed"):
-                query += " WHERE completed = ?"
-                params.append(1 if status == "completed" else 0)
-            query += " ORDER BY completed ASC, created_at DESC"
-            rows = conn.execute(query, params).fetchall()
+                query += " AND completed = ?"
+                params.append(int(status == "completed"))
+            rows = conn.execute(query + " ORDER BY completed ASC, created_at DESC", params)
             return [dict(row) | {"completed": bool(row["completed"])} for row in rows]
-        finally:
-            conn.close()
 
-    def create_todo(self, title: str, description: Optional[str] = None) -> Dict:
-        """Create and return a todo item."""
+    def create_todo(self, user_id: str, title: str, description: Optional[str] = None) -> Dict:
         todo_id = f"todo_{uuid.uuid4().hex[:12]}"
         now = datetime.now().isoformat()
-        conn = sqlite3.connect(self.db_path)
-        try:
+        with closing(sqlite3.connect(self.db_path)) as conn, conn:
+            conn.row_factory = sqlite3.Row
             conn.execute(
-                '''INSERT INTO todos (id, title, description, completed, created_at, updated_at)
-                   VALUES (?, ?, ?, 0, ?, ?)''',
-                (todo_id, title.strip(), description.strip() if description else None, now, now)
+                """INSERT INTO todos (id, user_id, title, description, completed, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, 0, ?, ?)""",
+                (todo_id, user_id, title.strip(), description.strip() if description else None, now, now),
             )
-            conn.commit()
-            row = conn.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
-            return {
-                "id": row[0], "title": row[1], "description": row[2],
-                "completed": bool(row[3]), "created_at": row[4], "updated_at": row[5]
-            }
-        finally:
-            conn.close()
+            row = conn.execute("SELECT * FROM todos WHERE id = ? AND user_id = ?", (todo_id, user_id)).fetchone()
+            return dict(row) | {"completed": bool(row["completed"])}
 
-    def update_todo(self, todo_id: str, title: Optional[str] = None,
-                    description: Optional[str] = None,
-                    completed: Optional[bool] = None) -> Optional[Dict]:
-        """Update supplied todo fields and return the updated item."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            current = conn.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
+    def update_todo(self, user_id: str, todo_id: str, title: Optional[str] = None,
+                    description: Optional[str] = None, completed: Optional[bool] = None) -> Optional[Dict]:
+        with closing(sqlite3.connect(self.db_path)) as conn, conn:
+            conn.row_factory = sqlite3.Row
+            current = conn.execute("SELECT * FROM todos WHERE id = ? AND user_id = ?", (todo_id, user_id)).fetchone()
             if not current:
                 return None
-            new_title = title.strip() if title is not None else current["title"]
-            new_description = description.strip() if description is not None else current["description"]
-            new_completed = int(completed) if completed is not None else current["completed"]
-            now = datetime.now().isoformat()
             conn.execute(
-                '''UPDATE todos
-                   SET title = ?, description = ?, completed = ?, updated_at = ?
-                   WHERE id = ?''',
-                (new_title, new_description, new_completed, now, todo_id)
+                """UPDATE todos SET title = ?, description = ?, completed = ?, updated_at = ?
+                   WHERE id = ? AND user_id = ?""",
+                (title.strip() if title is not None else current["title"],
+                 description.strip() if description is not None else current["description"],
+                 int(completed) if completed is not None else current["completed"],
+                 datetime.now().isoformat(), todo_id, user_id),
             )
-            conn.commit()
-            row = conn.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
+            row = conn.execute("SELECT * FROM todos WHERE id = ? AND user_id = ?", (todo_id, user_id)).fetchone()
             return dict(row) | {"completed": bool(row["completed"])}
-        finally:
-            conn.close()
 
-    def delete_todo(self, todo_id: str) -> bool:
-        """Delete a todo item."""
-        conn = sqlite3.connect(self.db_path)
-        try:
-            cursor = conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
-            conn.commit()
-            return cursor.rowcount > 0
-        finally:
-            conn.close()
-    
+    def delete_todo(self, user_id: str, todo_id: str) -> bool:
+        with closing(sqlite3.connect(self.db_path)) as conn, conn:
+            return conn.execute("DELETE FROM todos WHERE id = ? AND user_id = ?", (todo_id, user_id)).rowcount > 0
+
     def delete_analysis(self, analysis_id: str, user_id: Optional[str] = None) -> bool:
         """Delete analysis from database"""
         try:
@@ -403,13 +386,19 @@ class Database:
             cursor = conn.cursor()
             
             if user_id:
+                cursor.execute('SELECT 1 FROM analyses WHERE id = ? AND user_id = ?', (analysis_id, user_id))
+            else:
+                cursor.execute('SELECT 1 FROM analyses WHERE id = ?', (analysis_id,))
+            if cursor.fetchone() is None:
+                conn.close()
+                return False
+            cursor.execute('DELETE FROM feedback_cache WHERE analysis_id = ?', (analysis_id,))
+            if user_id:
                 cursor.execute('DELETE FROM analyses WHERE id = ? AND user_id = ?', (analysis_id, user_id))
             else:
                 cursor.execute('DELETE FROM analyses WHERE id = ?', (analysis_id,))
-            cursor.execute('DELETE FROM feedback_cache WHERE analysis_id = ?', (analysis_id,))
-            
-            conn.commit()
             success = cursor.rowcount > 0
+            conn.commit()
             conn.close()
             
             return success
@@ -466,22 +455,22 @@ class Database:
             print(f"Error getting progress stats: {e}")
             return {}
     
-    def get_stats(self) -> Dict:
+    def get_stats(self, user_id: str) -> Dict:
         """Get overall statistics"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
             # Total analyses
-            cursor.execute("SELECT COUNT(*) as count FROM analyses WHERE feedback NOT LIKE '%AI analysis unavailable%'")
+            cursor.execute("SELECT COUNT(*) FROM analyses WHERE user_id = ? AND feedback NOT LIKE '%AI analysis unavailable%'", (user_id,))
             total = cursor.fetchone()[0]
             
             # Average score
-            cursor.execute("SELECT AVG(score) as avg_score FROM analyses WHERE feedback NOT LIKE '%AI analysis unavailable%'")
+            cursor.execute("SELECT AVG(score) FROM analyses WHERE user_id = ? AND feedback NOT LIKE '%AI analysis unavailable%'", (user_id,))
             avg = cursor.fetchone()[0] or 0
             
             # Best score
-            cursor.execute("SELECT MAX(score) as max_score FROM analyses WHERE feedback NOT LIKE '%AI analysis unavailable%'")
+            cursor.execute("SELECT MAX(score) FROM analyses WHERE user_id = ? AND feedback NOT LIKE '%AI analysis unavailable%'", (user_id,))
             best = cursor.fetchone()[0] or 0
             
             # Feedback counts
@@ -493,8 +482,8 @@ class Database:
                     SUM(good_count) as total_good
                 FROM feedback_cache
                 JOIN analyses ON analyses.id = feedback_cache.analysis_id
-                WHERE analyses.feedback NOT LIKE '%AI analysis unavailable%'
-            ''')
+                WHERE analyses.user_id = ? AND analyses.feedback NOT LIKE '%AI analysis unavailable%'
+            ''', (user_id,))
             feedback_row = cursor.fetchone()
             
             conn.close()

@@ -3,3 +3,7 @@
 
 __pycache__/
 *.pyc
+
+# Local Linux environment and persistent development data
+.venv/
+data/
