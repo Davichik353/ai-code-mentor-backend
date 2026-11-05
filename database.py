@@ -5,6 +5,7 @@ import os
 from datetime import datetime
 from typing import List, Optional, Dict
 import uuid
+from learning import init_learning_schema
 
 class Database:
     def __init__(self, db_path: Optional[str] = None):
@@ -92,6 +93,7 @@ class Database:
                 # Legacy tasks have no provable owner and remain inaccessible.
                 cursor.execute("ALTER TABLE todos ADD COLUMN user_id TEXT REFERENCES users(id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_user_id ON todos(user_id)")
+            init_learning_schema(conn)
             conn.commit()
             conn.close()
             print("Database initialized successfully")
@@ -188,6 +190,7 @@ class Database:
 
     def delete_user(self, user_id: str) -> bool:
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA foreign_keys=ON")
         try:
             conn.execute('''
                 DELETE FROM feedback_cache

@@ -21,6 +21,7 @@ from models import (
 from claude_analyzer import CodeAnalyzer
 from database import Database
 from authorship import inspect_authorship
+from learning_routes import learning_router
 from auth import (
     create_access_token, decode_access_token, hash_password, is_valid_email,
     verify_password, is_disposable_email, is_strong_password
@@ -153,6 +154,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
+
+app.include_router(learning_router(lambda: db, current_user))
 
 UI_FILE = Path(__file__).with_name("ai-code-mentor-ui.html")
 
@@ -318,7 +321,8 @@ async def analyze_code(request: CodeAnalysisRequest, user=Depends(current_user))
         analysis_result = await analyzer.analyze(
             code=request.code,
             filename=request.filename or "code.py",
-            language=language
+            language=language,
+            response_language=request.response_language
         )
 
         if analysis_result.get("analysis_available") is False:

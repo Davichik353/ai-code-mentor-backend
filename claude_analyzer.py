@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 
 from rag_engine import RAGEngine
 from mentor_hints import MentorMode
+from analysis_contract import AnalysisFeedback
 
 _ENV_FILE = Path(__file__).resolve().parent / ".env"
 load_dotenv(_ENV_FILE)
@@ -68,7 +69,7 @@ class CodeAnalyzer:
             print(f"[claude_analyzer] {self._init_error}")
             return None
 
-    async def analyze(self, code: str, filename: str = "code.py", language: str = "auto") -> dict:
+    async def analyze(self, code: str, filename: str = "code.py", language: str = "auto", response_language: str = "en") -> dict:
         """
         Analyze code with 4-level feedback system.
         Returns: dict with critical, improvements, learning, and good feedback
@@ -118,70 +119,46 @@ Be encouraging but honest. Explain WHY, not just WHAT."""
 
 Provide detailed, structured feedback. Remember: respond with ONLY the JSON object, nothing else."""
 
+        output_language = {"ru": "Russian", "uz": "Uzbek (Latin alphabet)", "en": "English"}.get(response_language, "Russian")
+        system_prompt += f"\nWrite ALL explanations, summary and hints in {output_language}. Keep JSON keys and code identifiers unchanged. This language instruction overrides the comments language."
         full_prompt = f"{system_prompt}\n\n{user_prompt}"
 
-        response_text = None
-        last_error = None
-
-        # Try the already-selected model first, then fall back through the
-        # remaining candidates if it 404s (Google renames/retires model IDs).
+        # Cache only a model whose response passes JSON and structure validation.
         names_to_try = [self.model_name] + [n for n in self.model_candidates if n != self.model_name] \
             if self.model_name else self.model_candidates
-
         for name in names_to_try:
             if not name:
                 continue
-            print(f"[claude_analyzer] Trying model: {name} ...")
             try:
                 response = await client.aio.models.generate_content(
                     model=name,
                     contents=full_prompt,
                     config=genai_types.GenerateContentConfig(
                         temperature=0.3,
-                        max_output_tokens=2000,
-                        http_options=genai_types.HttpOptions(timeout=20000),  # 20s, in ms
+                        max_output_tokens=4096,
+                        response_mime_type="application/json",
+                        response_schema=AnalysisFeedback,
+                        http_options=genai_types.HttpOptions(timeout=20000),
                     )
                 )
                 response_text = (response.text or "").strip()
-                if response_text:
-                    self.model_name = name
-                    print(f"[claude_analyzer] {name} responded in time")
-                    break
-                else:
-                    print(f"[claude_analyzer] {name} returned empty response, trying next...")
-            except Exception as e:
-                print(f"[claude_analyzer] {name} failed: {e}")
-                last_error = e
-                continue
-
-        if not response_text:
-            print(f"Error calling Gemini API: {last_error}")
-            return self._create_default_feedback(code)
-
-        try:
-            # Gemini sometimes wraps JSON in ```json ... ``` even when told not to
-            response_text = re.sub(r'^```json\s*', '', response_text)
-            response_text = re.sub(r'^```\s*', '', response_text)
-            response_text = re.sub(r'```\s*$', '', response_text)
-            response_text = response_text.strip()
-
-            try:
-                feedback = json.loads(response_text)
-            except json.JSONDecodeError:
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if json_match:
-                    feedback = json.loads(json_match.group())
-                else:
-                    print(f"[claude_analyzer] Could not parse Gemini response as JSON")
-                    feedback = self._create_default_feedback(code)
-
-            # Day 2: attach documentation sources/citations via RAG
-            feedback = self.rag.add_context(feedback)
-            return feedback
-
-        except Exception as e:
-            print(f"Error parsing Gemini response: {e}")
-            return self._create_default_feedback(code)
+                response_text = re.sub(r'^```(?:json)?\s*', '', response_text)
+                response_text = re.sub(r'```\s*$', '', response_text).strip()
+                try:
+                    feedback = json.loads(response_text)
+                except json.JSONDecodeError:
+                    match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                    if not match:
+                        raise ValueError("No JSON object in provider response")
+                    feedback = json.loads(match.group())
+                feedback = AnalysisFeedback.model_validate(feedback).model_dump()
+                feedback = self.rag.add_context(feedback)
+                self.model_name = name
+                return feedback
+            except Exception as error:
+                # SDK errors may contain request details: never log credentials or full responses.
+                print(f"[claude_analyzer] {name} failed validation/request: {type(error).__name__}")
+        return self._create_default_feedback(code)
 
     def generate_hints(self, feedback: dict) -> list:
         """

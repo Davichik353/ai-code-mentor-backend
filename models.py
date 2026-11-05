@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 
 class FeedbackItem(BaseModel):
@@ -24,6 +24,7 @@ class CodeAnalysisRequest(BaseModel):
     code: str = Field(..., min_length=5, max_length=10000, description="Python code to analyze")
     filename: Optional[str] = Field(default="code.py", description="Original filename")
     language: Optional[str] = Field(default=None, description="Programming language (auto-detected when omitted)")
+    response_language: Literal["ru", "uz", "en"] = "ru"
     
     class Config:
         json_schema_extra = {
