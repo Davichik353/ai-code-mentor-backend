@@ -54,6 +54,13 @@ class SnapshotMigrationTests(unittest.TestCase):
         try:self.assertTrue(verify_snapshot(self.source,reopened)['verified'])
         finally:reopened.close()
 
+    def test_turso_internal_metadata_is_preserved_and_not_treated_as_user_data(self):
+        self.target.execute('CREATE TABLE __turso_internal_probe (k TEXT PRIMARY KEY, v INTEGER)')
+        self.target.execute("INSERT INTO __turso_internal_probe VALUES ('engine', 1)")
+        self.target.commit()
+        self.assertTrue(self.migrate()['verified'])
+        self.assertEqual(self.target.execute('SELECT v FROM __turso_internal_probe').fetchone()[0], 1)
+
     def test_repeat_of_identical_copy_is_read_only(self):
         self.assertFalse(self.migrate()['already_present'])
         self.assertTrue(self.migrate()['already_present'])
@@ -96,5 +103,11 @@ class SnapshotMigrationTests(unittest.TestCase):
 
 @unittest.skipUnless(turso is not None,'Optional new Turso engine: install requirements-dev.txt')
 class TursoSnapshotMigrationTests(SnapshotMigrationTests):
+    def test_turso_internal_metadata_is_preserved_and_not_treated_as_user_data(self):
+        # Native Turso owns this namespace and prevents users replacing it.
+        with self.assertRaises(sqlite3.OperationalError):
+            self.target.execute('CREATE TABLE __turso_internal_probe (k TEXT PRIMARY KEY, v INTEGER)')
+        self.assertTrue(self.migrate()['verified'])
+
     def connect(self,path):
         return Connection(turso.connect(str(path)))
