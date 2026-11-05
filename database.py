@@ -1,4 +1,5 @@
 import sqlite3
+from storage import connect
 from contextlib import closing
 import json
 import os
@@ -17,7 +18,7 @@ class Database:
     def init_db(self):
         """Initialize database with tables"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = connect(self.db_path)
             cursor = conn.cursor()
             
             # Users table
@@ -110,7 +111,7 @@ class Database:
                     email_verified: int = 0) -> Optional[str]:
         """Create a new user. Returns the new user's id, or None if email already exists."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = connect(self.db_path)
             cursor = conn.cursor()
             
             user_id = f"user_{uuid.uuid4().hex[:12]}"
@@ -136,7 +137,7 @@ class Database:
     def get_user_by_email(self, email: str) -> Optional[Dict]:
         """Look up a user by email. Returns dict with id/email/password_hash/display_name, or None."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -154,7 +155,7 @@ class Database:
     def get_user_by_id(self, user_id: str) -> Optional[Dict]:
         """Look up a user by id. Returns dict without password_hash, or None."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -165,7 +166,7 @@ class Database:
             if row:
                 user_dict = dict(row)
                 # Calculate level and XP from analyses count
-                stats_conn = sqlite3.connect(self.db_path)
+                stats_conn = connect(self.db_path)
                 stats_cur = stats_conn.cursor()
                 stats_cur.execute('''
                     SELECT COUNT(*) as count, AVG(score) as avg_score
@@ -189,7 +190,7 @@ class Database:
             return None
 
     def delete_user(self, user_id: str) -> bool:
-        conn = sqlite3.connect(self.db_path)
+        conn = connect(self.db_path)
         conn.execute("PRAGMA foreign_keys=ON")
         try:
             conn.execute('''
@@ -205,7 +206,7 @@ class Database:
             conn.close()
 
     def verify_user_email(self, token_hash: str) -> Optional[Dict]:
-        conn = sqlite3.connect(self.db_path)
+        conn = connect(self.db_path)
         conn.row_factory = sqlite3.Row
         try:
             row = conn.execute(
@@ -229,7 +230,7 @@ class Database:
     def save_analysis(self, code: str, filename: str, feedback: dict, score: int, user_id: Optional[str] = None) -> str:
         """Save code analysis to database. user_id is optional — anonymous analyses are still supported."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = connect(self.db_path)
             cursor = conn.cursor()
             
             analysis_id = f"analysis_{uuid.uuid4().hex[:12]}"
@@ -263,7 +264,7 @@ class Database:
     def get_analysis(self, analysis_id: str, user_id: Optional[str] = None) -> Optional[Dict]:
         """Get specific analysis by ID"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -293,7 +294,7 @@ class Database:
         """Get analysis history. If user_id is given, only that user's analyses are returned;
         otherwise all analyses (anonymous + everyone's) are returned, as before."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -337,7 +338,7 @@ class Database:
             return []
 
     def get_todos(self, user_id: str, status: Optional[str] = None) -> List[Dict]:
-        with closing(sqlite3.connect(self.db_path)) as conn, conn:
+        with closing(connect(self.db_path)) as conn, conn:
             conn.row_factory = sqlite3.Row
             query = "SELECT * FROM todos WHERE user_id = ?"
             params = [user_id]
@@ -350,7 +351,7 @@ class Database:
     def create_todo(self, user_id: str, title: str, description: Optional[str] = None) -> Dict:
         todo_id = f"todo_{uuid.uuid4().hex[:12]}"
         now = datetime.now().isoformat()
-        with closing(sqlite3.connect(self.db_path)) as conn, conn:
+        with closing(connect(self.db_path)) as conn, conn:
             conn.row_factory = sqlite3.Row
             conn.execute(
                 """INSERT INTO todos (id, user_id, title, description, completed, created_at, updated_at)
@@ -362,7 +363,7 @@ class Database:
 
     def update_todo(self, user_id: str, todo_id: str, title: Optional[str] = None,
                     description: Optional[str] = None, completed: Optional[bool] = None) -> Optional[Dict]:
-        with closing(sqlite3.connect(self.db_path)) as conn, conn:
+        with closing(connect(self.db_path)) as conn, conn:
             conn.row_factory = sqlite3.Row
             current = conn.execute("SELECT * FROM todos WHERE id = ? AND user_id = ?", (todo_id, user_id)).fetchone()
             if not current:
@@ -379,13 +380,13 @@ class Database:
             return dict(row) | {"completed": bool(row["completed"])}
 
     def delete_todo(self, user_id: str, todo_id: str) -> bool:
-        with closing(sqlite3.connect(self.db_path)) as conn, conn:
+        with closing(connect(self.db_path)) as conn, conn:
             return conn.execute("DELETE FROM todos WHERE id = ? AND user_id = ?", (todo_id, user_id)).rowcount > 0
 
     def delete_analysis(self, analysis_id: str, user_id: Optional[str] = None) -> bool:
         """Delete analysis from database"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = connect(self.db_path)
             cursor = conn.cursor()
             
             if user_id:
@@ -412,7 +413,7 @@ class Database:
     def get_progress_stats(self, user_id: Optional[str] = None) -> Dict:
         """Get progress statistics for one user, or all analyses when anonymous."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = connect(self.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -461,7 +462,7 @@ class Database:
     def get_stats(self, user_id: str) -> Dict:
         """Get overall statistics"""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = connect(self.db_path)
             cursor = conn.cursor()
             
             # Total analyses

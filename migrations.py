@@ -3,13 +3,14 @@ Database migration script for production optimization.
 Adds indexes on frequently queried columns and optimizes schema.
 """
 import sqlite3
+from storage import connect, remote_enabled
 from datetime import datetime
 import sys
 
 
 def run_migrations(db_path: str = "code_mentor.db"):
     """Run all database migrations for production optimization."""
-    conn = sqlite3.connect(db_path)
+    conn = connect(db_path)
     cursor = conn.cursor()
 
     try:
@@ -83,7 +84,8 @@ def run_migrations(db_path: str = "code_mentor.db"):
         # 3. Vacuum to optimize database file
         conn.commit()
         print("[Migration] Running VACUUM to optimize database...")
-        cursor.execute("VACUUM")
+        if not remote_enabled():
+            cursor.execute("VACUUM")
 
         # 4. Analyze for query planner
         print("[Migration] Running ANALYZE for query optimization...")

@@ -8,6 +8,7 @@ Provides:
 """
 
 import sqlite3
+from storage import connect, remote_enabled
 import psutil
 import time
 import os
@@ -35,7 +36,7 @@ class SimpleConnectionPool:
 
         try:
             if len(self.connections) < self.max_connections:
-                conn = sqlite3.connect(self.db_path, timeout=5.0)
+                conn = connect(self.db_path, timeout=5.0)
             else:
                 # Reuse oldest idle connection
                 conn, _ = self.connections.pop(0)
@@ -88,7 +89,8 @@ class HealthChecker:
             return {
                 "status": "ok",
                 "response_time_ms": round(response_time, 2),
-                "details": "Database responding normally"
+                "details": "Database responding normally",
+                "backend": "turso" if remote_enabled() else "sqlite"
             }
 
         except Exception as e:

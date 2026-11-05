@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -183,7 +183,7 @@ async def health_check():
     health_checker = get_health_checker(db.db_path)
     health_data = health_checker.get_health_status()
     status_code = 200 if health_data["status"] == "healthy" else 503
-    return health_data
+    return JSONResponse(content=health_data, status_code=status_code)
 
 
 @app.get("/metrics")

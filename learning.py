@@ -5,6 +5,7 @@ import hashlib
 import json
 import secrets
 import sqlite3
+from storage import connect
 from fastapi import HTTPException
 from learning_content import TEMPLATES
 
@@ -64,7 +65,7 @@ class Learning:
 
     @contextmanager
     def connect(self):
-        conn = sqlite3.connect(self.path, timeout=10)
+        conn = connect(self.path, timeout=10)
         conn.row_factory = sqlite3.Row
         conn.execute('PRAGMA foreign_keys=ON')
         try:

@@ -6,3 +6,5 @@ google-genai==2.18.1
 requests==2.31.0
 PyJWT>=2.8.0
 psutil>=6.0.0
+libsql==0.1.11
+turso_serverless==0.1.0
