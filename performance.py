@@ -8,99 +8,43 @@ import threading
 
 
 class RateLimiter:
-    """Token bucket rate limiter with per-IP tracking."""
-
-    def __init__(self, requests_per_minute: int = 60, requests_per_hour: int = 1000):
-        """
-        Initialize rate limiter.
-
-        Args:
-            requests_per_minute: Max requests per minute per IP
-            requests_per_hour: Max requests per hour per IP
-        """
+    """Bounded process-local sliding window; deploy one worker until using shared limits."""
+    def __init__(self, requests_per_minute=60, requests_per_hour=1000, max_keys=10000):
         self.requests_per_minute = requests_per_minute
         self.requests_per_hour = requests_per_hour
-        self._locks: Dict[str, threading.Lock] = {}
-        self._requests: Dict[str, list] = defaultdict(list)
-        self._cleanup_thread = None
-        self._running = False
+        self.max_keys = max_keys
+        self._requests = {}
+        self._lock = threading.Lock()
+        self._last_cleanup = 0
 
-    def _get_lock(self, ip: str) -> threading.Lock:
-        """Get or create lock for IP."""
-        if ip not in self._locks:
-            self._locks[ip] = threading.Lock()
-        return self._locks[ip]
+    def is_allowed(self, ip):
+        import time
+        now = time.monotonic()
+        with self._lock:
+            if now - self._last_cleanup >= 60:
+                self._requests = {k: v for k, v in self._requests.items() if v and v[-1] > now - 3600}
+                self._last_cleanup = now
+            if ip not in self._requests and len(self._requests) >= self.max_keys:
+                return False, {"retry_after": 60}
+            entries = self._requests.setdefault(ip, [])
+            entries[:] = [stamp for stamp in entries if stamp > now - 3600]
+            recent = [stamp for stamp in entries if stamp > now - 60]
+            if len(recent) >= self.requests_per_minute or len(entries) >= self.requests_per_hour:
+                retry = (recent[0] + 60 if len(recent) >= self.requests_per_minute else entries[0] + 3600) - now
+                return False, {"retry_after": max(1, int(retry) + 1)}
+            entries.append(now)
+            return True, {"remaining_minute": self.requests_per_minute - len(recent) - 1,
+                          "remaining_hour": self.requests_per_hour - len(entries)}
 
-    def is_allowed(self, ip: str) -> Tuple[bool, Dict[str, any]]:
-        """
-        Check if request from IP is allowed.
+    def clear(self):
+        with self._lock:
+            self._requests.clear()
 
-        Returns:
-            Tuple of (allowed: bool, info: dict with retry_after and limits)
-        """
-        now = datetime.now()
-        lock = self._get_lock(ip)
-
-        with lock:
-            # Clean old entries
-            minute_ago = now - timedelta(minutes=1)
-            hour_ago = now - timedelta(hours=1)
-
-            requests = self._requests[ip]
-            requests[:] = [r for r in requests if r > hour_ago]
-
-            # Count recent requests
-            recent_minute = sum(1 for r in requests if r > minute_ago)
-            recent_hour = len(requests)
-
-            # Check limits
-            minute_ok = recent_minute < self.requests_per_minute
-            hour_ok = recent_hour < self.requests_per_hour
-
-            if minute_ok and hour_ok:
-                self._requests[ip].append(now)
-                return True, {
-                    "remaining_minute": self.requests_per_minute - recent_minute - 1,
-                    "remaining_hour": self.requests_per_hour - recent_hour - 1,
-                    "limit_minute": self.requests_per_minute,
-                    "limit_hour": self.requests_per_hour,
-                }
-
-            # Calculate retry-after
-            if not minute_ok:
-                oldest_minute = min(r for r in requests if r > minute_ago)
-                retry_after = (oldest_minute - minute_ago).total_seconds() + 1
-            else:
-                oldest_hour = min(requests)
-                retry_after = (oldest_hour - hour_ago).total_seconds() + 1
-
-            return False, {
-                "retry_after": int(retry_after),
-                "remaining_minute": 0 if not minute_ok else recent_minute,
-                "remaining_hour": 0 if not hour_ok else recent_hour,
-                "limit_minute": self.requests_per_minute,
-                "limit_hour": self.requests_per_hour,
-            }
-
-    def get_stats(self, ip: Optional[str] = None) -> Dict:
-        """Get rate limiter statistics."""
-        if ip:
-            lock = self._get_lock(ip)
-            with lock:
-                requests = self._requests.get(ip, [])
-                now = datetime.now()
-                minute_ago = now - timedelta(minutes=1)
-                recent = sum(1 for r in requests if r > minute_ago)
-                return {
-                    "ip": ip,
-                    "requests_tracked": len(requests),
-                    "requests_last_minute": recent,
-                }
-        else:
-            return {
-                "ips_tracked": len(self._requests),
-                "total_entries": sum(len(r) for r in self._requests.values()),
-            }
+    def get_stats(self, ip=None):
+        with self._lock:
+            if ip is not None:
+                return {"ip": ip, "requests_tracked": len(self._requests.get(ip, []))}
+            return {"ips_tracked": len(self._requests), "total_entries": sum(map(len, self._requests.values()))}
 
 
 class PerformanceMetrics:

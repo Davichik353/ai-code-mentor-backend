@@ -1,0 +1,27 @@
+
+.env
+
+__pycache__/
+*.pyc
+
+# Local Linux environment and persistent development data
+.venv/
+data/
+
+# Private data, secrets and generated environments
+venv/
+.env.*
+!.env.example
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.backup
+*.fernet
+backups/
+8}
+download
+
+.git/
+.github/

@@ -1,3 +1,4 @@
+from pathlib import Path
 import sqlite3
 from storage import connect
 from contextlib import closing
@@ -10,7 +11,7 @@ from learning import init_learning_schema
 
 class Database:
     def __init__(self, db_path: Optional[str] = None):
-        self.db_path = db_path or os.getenv("DATABASE_PATH", "code_mentor.db")
+        self.db_path = db_path or os.getenv("DATABASE_PATH") or str(Path.home() / ".local/share/ai-code-mentor/code_mentor.db")
         parent = os.path.dirname(os.path.abspath(self.db_path))
         os.makedirs(parent, exist_ok=True)
         self.connection = None
@@ -65,6 +66,19 @@ class Database:
             if "verification_expires_at" not in user_columns:
                 cursor.execute("ALTER TABLE users ADD COLUMN verification_expires_at DATETIME")
             
+            for column, definition in {
+                "token_version": "INTEGER NOT NULL DEFAULT 0",
+                "reset_token_hash": "TEXT", "reset_expires_at": "TEXT",
+            }.items():
+                if column not in user_columns:
+                    cursor.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_reset_hash ON users(reset_token_hash)")
+            cursor.execute("CREATE TABLE IF NOT EXISTS analysis_quotas (scope TEXT NOT NULL, day TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(scope, day))")
+            cursor.execute("""CREATE TABLE IF NOT EXISTS ai_usage (
+                id TEXT PRIMARY KEY, user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+                model TEXT NOT NULL, input_tokens INTEGER, output_tokens INTEGER,
+                total_tokens INTEGER, outcome TEXT NOT NULL, created_at TEXT NOT NULL)""")
+
             # Feedback cache for quick lookup
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS feedback_cache (
@@ -159,7 +173,7 @@ class Database:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            cursor.execute('SELECT id, email, display_name, email_verified, created_at FROM users WHERE id = ?', (user_id,))
+            cursor.execute('SELECT id, email, display_name, email_verified, created_at, token_version FROM users WHERE id = ?', (user_id,))
             row = cursor.fetchone()
             conn.close()
 
@@ -197,6 +211,7 @@ class Database:
                 DELETE FROM feedback_cache
                 WHERE analysis_id IN (SELECT id FROM analyses WHERE user_id = ?)
             ''', (user_id,))
+            conn.execute("DELETE FROM ai_usage WHERE user_id = ?", (user_id,))
             conn.execute("DELETE FROM todos WHERE user_id = ?", (user_id,))
             conn.execute("DELETE FROM analyses WHERE user_id = ?", (user_id,))
             cursor = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
@@ -227,6 +242,55 @@ class Database:
         finally:
             conn.close()
     
+    def issue_password_reset(self, user_id, token_hash, expires):
+        conn = connect(self.db_path)
+        try:
+            conn.execute("UPDATE users SET reset_token_hash=?, reset_expires_at=? WHERE id=?", (token_hash, expires, user_id))
+            conn.commit()
+        finally:
+            conn.close()
+
+    def reset_password(self, token_hash, password_hash):
+        conn = connect(self.db_path)
+        try:
+            cursor = conn.execute("""UPDATE users SET password_hash=?, token_version=token_version+1,
+                reset_token_hash=NULL, reset_expires_at=NULL
+                WHERE reset_token_hash=? AND reset_expires_at>?""",
+                (password_hash, token_hash, datetime.utcnow().isoformat()))
+            conn.commit()
+            return cursor.rowcount == 1
+        finally:
+            conn.close()
+
+    def reserve_analysis_quota(self, user_id, user_limit, global_limit):
+        """Atomic daily quotas persist across restarts and concurrent API workers."""
+        import hashlib
+        day = datetime.utcnow().date().isoformat()
+        conn = connect(self.db_path)
+        try:
+            for scope, limit in [("all", global_limit), (hashlib.sha256(user_id.encode()).hexdigest(), user_limit)]:
+                cursor = conn.execute("""INSERT INTO analysis_quotas(scope,day,count) VALUES(?,?,1)
+                    ON CONFLICT(scope,day) DO UPDATE SET count=count+1 WHERE count<?""", (scope, day, limit))
+                if cursor.rowcount != 1:
+                    conn.rollback()
+                    return False
+            conn.execute("DELETE FROM analysis_quotas WHERE day < date(?, '-2 days')", (day,))
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def record_ai_usage(self, user_id, usage):
+        conn = connect(self.db_path)
+        try:
+            for row in usage:
+                conn.execute("""INSERT INTO ai_usage(id,user_id,model,input_tokens,output_tokens,total_tokens,outcome,created_at)
+                    VALUES(?,?,?,?,?,?,?,?)""", (uuid.uuid4().hex, user_id, row['model'], row['input_tokens'],
+                    row['output_tokens'], row['total_tokens'], row['outcome'], datetime.utcnow().isoformat()))
+            conn.commit()
+        finally:
+            conn.close()
+
     def save_analysis(self, code: str, filename: str, feedback: dict, score: int, user_id: Optional[str] = None) -> str:
         """Save code analysis to database. user_id is optional — anonymous analyses are still supported."""
         try:

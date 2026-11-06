@@ -69,7 +69,7 @@ class CodeAnalyzer:
             print(f"[claude_analyzer] {self._init_error}")
             return None
 
-    async def analyze(self, code: str, filename: str = "code.py", language: str = "auto", response_language: str = "en") -> dict:
+    async def analyze(self, code: str, filename: str = "code.py", language: str = "auto", response_language: str = "en", usage_recorder=None) -> dict:
         """
         Analyze code with 4-level feedback system.
         Returns: dict with critical, improvements, learning, and good feedback
@@ -129,6 +129,8 @@ Provide detailed, structured feedback. Remember: respond with ONLY the JSON obje
         for name in names_to_try:
             if not name:
                 continue
+            usage = {'model': name, 'input_tokens': None, 'output_tokens': None,
+                     'total_tokens': None, 'outcome': 'provider_error'}
             try:
                 response = await client.aio.models.generate_content(
                     model=name,
@@ -141,6 +143,16 @@ Provide detailed, structured feedback. Remember: respond with ONLY the JSON obje
                         http_options=genai_types.HttpOptions(timeout=20000),
                     )
                 )
+                metadata = getattr(response, 'usage_metadata', None)
+                def count(field):
+                    value = getattr(metadata, field, None)
+                    return value if isinstance(value, int) and value >= 0 else None
+                usage['input_tokens'] = count('prompt_token_count')
+                usage['total_tokens'] = count('total_token_count')
+                usage['output_tokens'] = (max(0, usage['total_tokens'] - usage['input_tokens'])
+                    if usage['total_tokens'] is not None and usage['input_tokens'] is not None
+                    else count('candidates_token_count'))
+                usage['outcome'] = 'invalid_response'
                 response_text = (response.text or "").strip()
                 response_text = re.sub(r'^```(?:json)?\s*', '', response_text)
                 response_text = re.sub(r'```\s*$', '', response_text).strip()
@@ -154,10 +166,16 @@ Provide detailed, structured feedback. Remember: respond with ONLY the JSON obje
                 feedback = AnalysisFeedback.model_validate(feedback).model_dump()
                 feedback = self.rag.add_context(feedback)
                 self.model_name = name
+                usage["outcome"] = "validated"
                 return feedback
             except Exception as error:
                 # SDK errors may contain request details: never log credentials or full responses.
                 print(f"[claude_analyzer] {name} failed validation/request: {type(error).__name__}")
+            finally:
+                # Include billed retries and malformed outputs, not only successful analyses.
+                # No code, prompts, email or provider responses enter this ledger.
+                if usage_recorder is not None:
+                    usage_recorder([usage])
         return self._create_default_feedback(code)
 
     def generate_hints(self, feedback: dict) -> list:

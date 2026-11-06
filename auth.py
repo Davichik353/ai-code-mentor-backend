@@ -55,11 +55,12 @@ def verify_password(password: str, stored: str) -> bool:
     return hmac.compare_digest(actual, expected)
 
 
-def create_access_token(user_id: str, email: str) -> str:
+def create_access_token(user_id: str, email: str, token_version: int = 0) -> str:
     """Create a signed JWT for a user, valid for JWT_EXPIRY_SECONDS."""
     now = int(time.time())
     payload = {
         "sub": user_id,
+        "ver": token_version,
         "email": email,
         "iat": now,
         "exp": now + JWT_EXPIRY_SECONDS,

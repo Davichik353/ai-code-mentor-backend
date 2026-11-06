@@ -37,3 +37,25 @@ class AsyncAnalyzerTests(unittest.IsolatedAsyncioTestCase):
         result = await analyzer.analyze('print(42)', 'example.py', 'Python')
         self.assertFalse(result['analysis_available'])
         self.assertIsNone(analyzer.model_name)
+
+    async def test_usage_records_retries_and_reasoning_tokens(self):
+        analyzer = CodeAnalyzer()
+        valid = '{"summary":"Reviewed","critical":[],"improvements":[],"learning":[],"good":[]}'
+        usage = SimpleNamespace(prompt_token_count=100,total_token_count=160,candidates_token_count=20)
+        generate = AsyncMock(side_effect=[SimpleNamespace(text='invalid',usage_metadata=usage),SimpleNamespace(text=valid,usage_metadata=usage)])
+        analyzer.client = SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate)))
+        rows=[]
+        await analyzer.analyze('print(42)', usage_recorder=rows.extend)
+        self.assertEqual(len(rows),2)
+        self.assertEqual([r['outcome'] for r in rows],['invalid_response','validated'])
+        self.assertEqual([r['output_tokens'] for r in rows],[60,60])
+
+    async def test_missing_usage_metadata_is_unknown(self):
+        analyzer=CodeAnalyzer()
+        generate=AsyncMock(side_effect=RuntimeError('provider failed'))
+        analyzer.client=SimpleNamespace(aio=SimpleNamespace(models=SimpleNamespace(generate_content=generate)))
+        rows=[]
+        result=await analyzer.analyze('print(42)',usage_recorder=rows.extend)
+        self.assertFalse(result['analysis_available'])
+        self.assertEqual(len(rows),3)
+        self.assertTrue(all(r['total_tokens'] is None and r['outcome']=='provider_error' for r in rows))

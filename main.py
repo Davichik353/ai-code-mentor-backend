@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, Query, Depends, Request
+from fastapi import FastAPI, HTTPException, Query, Depends, Request, BackgroundTasks
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -16,7 +16,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 from models import (
     CodeAnalysisRequest, CodeAnalysisResponse, AnalysisItem, FeedbackItem,
     TodoCreate, TodoUpdate, TodoItem, UserRegister, UserLogin, TokenResponse, UserResponse,
-    RegistrationResponse
+    RegistrationResponse, PasswordResetRequest, PasswordResetConfirm
 )
 from claude_analyzer import CodeAnalyzer
 from database import Database
@@ -40,13 +40,17 @@ from email.message import EmailMessage
 db = Database()
 analyzer = CodeAnalyzer()
 security = HTTPBearer(auto_error=True)
-registration_attempts = {}
+registration_ip_limiter = RateLimiter(10, 60)
+registration_email_limiter = RateLimiter(3, 3)
 
 # Initialize performance optimization components
 cache = get_cache()
 rate_limiter = get_rate_limiter()
 metrics = get_metrics()
 analysis_limiter = RateLimiter(requests_per_minute=5, requests_per_hour=60)
+login_limiter = RateLimiter(10, 50)
+reset_limiter = RateLimiter(3, 3)
+DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(24))
 LANGUAGE_BY_EXTENSION = {
     ".py": "Python", ".js": "JavaScript", ".jsx": "JavaScript/JSX", ".ts": "TypeScript",
     ".tsx": "TypeScript/TSX", ".java": "Java", ".c": "C", ".h": "C", ".cpp": "C++",
@@ -61,7 +65,7 @@ def current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail="Registration or login is required")
     payload = decode_access_token(credentials.credentials)
     user = db.get_user_by_id(payload["sub"]) if payload and payload.get("sub") else None
-    if not user:
+    if not user or payload.get("ver", 0) != user.get("token_version", 0):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return user
 
@@ -113,6 +117,9 @@ async def lifespan(app: FastAPI):
         print("[main] WARNING: GOOGLE_API_KEY is not set — /analyze will use fallback feedback only")
     if not os.getenv("JWT_SECRET"):
         print("[main] WARNING: JWT_SECRET is not set — logins will be invalidated on every restart")
+    if os.getenv("PUBLIC_LAUNCH", "false").lower() == "true":
+        if not smtp_configured() or not require_email_verification():
+            raise RuntimeError("Public launch requires SMTP and email verification")
     if not require_email_verification():
         print("[main] Email verification is OFF (demo mode). Set REQUIRE_EMAIL_VERIFICATION=true after SMTP works.")
 
@@ -127,7 +134,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AI Code Mentor",
-    description="Intelligent code analysis with Claude AI",
+    description="Programming practice, teacher groups and Gemini code feedback",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -147,6 +154,10 @@ frontend_origins.update(
     if origin.strip()
 )
 
+from request_security import RequestSecurity
+api_limiter = RateLimiter(int(os.getenv("API_REQUESTS_PER_MINUTE", "120")), 3000)
+auth_ip_limiter = RateLimiter(int(os.getenv("AUTH_REQUESTS_PER_MINUTE", "15")), 100)
+app.add_middleware(RequestSecurity, general=api_limiter, auth=auth_ip_limiter)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(frontend_origins),
@@ -157,19 +168,11 @@ app.add_middleware(
 
 app.include_router(learning_router(lambda: db, current_user))
 
-UI_FILE = Path(__file__).with_name("ai-code-mentor-ui.html")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://ai-code-mentor-frontend-iota.vercel.app").rstrip("/")
 
 @app.get("/")
-async def root(request: Request):
-    accept = request.headers.get("accept", "")
-    if UI_FILE.exists() and "text/html" in accept:
-        return FileResponse(UI_FILE)
-    return {
-        "message": "AI Code Mentor API",
-        "version": "1.0.0",
-        "status": "running",
-        "ui": "/app"
-    }
+async def root():
+    return {"message": "AI Code Mentor API", "version": "1.0.0", "status": "running", "ui": FRONTEND_URL}
 
 @app.get("/health")
 async def health_check():
@@ -206,9 +209,7 @@ async def metrics_endpoint():
 
 @app.get("/app")
 async def app_ui():
-    if not UI_FILE.exists():
-        raise HTTPException(status_code=404, detail="UI file is missing")
-    return FileResponse(UI_FILE)
+    return RedirectResponse(FRONTEND_URL, status_code=307)
 
 @app.post("/auth/register", response_model=RegistrationResponse, status_code=201)
 async def register(user: UserRegister, request: Request):
@@ -219,19 +220,12 @@ async def register(user: UserRegister, request: Request):
         raise HTTPException(status_code=400, detail="Disposable email addresses are not allowed")
     if not is_strong_password(user.password):
         raise HTTPException(status_code=400, detail="Password must be 10+ characters with upper, lower, number, and symbol")
-    now = datetime.now().timestamp()
     client_ip = request.client.host if request.client else "unknown"
-    # Rate limit by IP
-    recent_ip = [stamp for stamp in registration_attempts.get(client_ip, []) if now - stamp < 3600]
-    if len(recent_ip) >= 5:
-        raise HTTPException(status_code=429, detail="Too many registration attempts. Try again later.")
-    registration_attempts[client_ip] = recent_ip + [now]
-    # Rate limit by email
-    email_attempts = registration_attempts.get(f"email_{email}", [])
-    recent_email = [stamp for stamp in email_attempts if now - stamp < 3600]
-    if len(recent_email) >= 3:
-        raise HTTPException(status_code=429, detail="Too many attempts for this email. Try again later.")
-    registration_attempts[f"email_{email}"] = recent_email + [now]
+    identity = hashlib.sha256(email.encode()).hexdigest()
+    for limiter, key in ((registration_ip_limiter, client_ip), (registration_email_limiter, identity)):
+        allowed, info = limiter.is_allowed(key)
+        if not allowed:
+            raise HTTPException(429, "Too many registration attempts", headers={"Retry-After": str(info['retry_after'])})
     verify = require_email_verification()
     token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(token.encode()).hexdigest() if verify else None
@@ -265,17 +259,73 @@ async def verify_email(email: str, code: str):
     user = db.verify_user_email(hashlib.sha256(code.encode()).hexdigest())
     if not user or user["email"].lower() != email.lower().strip():
         raise HTTPException(status_code=400, detail="Invalid or expired verification code")
-    return TokenResponse(access_token=create_access_token(user["id"], user["email"]), user=UserResponse(**db.get_user_by_id(user["id"])))
+    return TokenResponse(access_token=create_access_token(user["id"], user["email"], user["token_version"]), user=UserResponse(**db.get_user_by_id(user["id"])))
 
 @app.post("/auth/login", response_model=TokenResponse)
-async def login(user: UserLogin):
+def login(user: UserLogin):
+    identity = hashlib.sha256(user.email.strip().lower().encode()).hexdigest()
+    allowed, info = login_limiter.is_allowed(identity)
+    if not allowed:
+        raise HTTPException(429, "Too many sign-in attempts", headers={"Retry-After": str(info['retry_after'])})
     record = db.get_user_by_email(user.email)
-    if not record or not verify_password(user.password, record["password_hash"]):
+    valid = verify_password(user.password, record["password_hash"] if record else DUMMY_PASSWORD_HASH)
+    if not record or not valid:
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     if record["email_verified"] == 0 and require_email_verification():
         raise HTTPException(status_code=403, detail="Verify your email before signing in")
     public_user = db.get_user_by_id(record["id"])
-    return TokenResponse(access_token=create_access_token(record["id"], record["email"]), user=UserResponse(**public_user))
+    return TokenResponse(access_token=create_access_token(record["id"], record["email"], record["token_version"]), user=UserResponse(**public_user))
+
+@app.post("/auth/forgot-password")
+def forgot_password(body: PasswordResetRequest, background_tasks: BackgroundTasks):
+    if not smtp_configured():
+        raise HTTPException(503, "Password recovery is temporarily unavailable")
+    email = body.email.strip().lower()
+    identity = hashlib.sha256(email.encode()).hexdigest()
+    allowed, info = reset_limiter.is_allowed(identity)
+    if not allowed:
+        raise HTTPException(429, "Too many recovery requests", headers={"Retry-After": str(info['retry_after'])})
+    # Queue lookup/delivery after responding, including lookup for absent accounts.
+    # SMTP latency must not reveal account existence in the HTTP response time.
+    background_tasks.add_task(deliver_password_recovery, email)
+    return {"message": "If an account exists, a recovery email will be sent."}
+
+
+def deliver_password_recovery(email):
+    record = db.get_user_by_email(email)
+    if record:
+        token = secrets.token_urlsafe(32)
+        db.issue_password_reset(record['id'], hashlib.sha256(token.encode()).hexdigest(),
+            (datetime.utcnow() + timedelta(minutes=15)).isoformat())
+        try:
+            send_password_reset_email(email, token)
+        except Exception:
+            # Do not disclose account existence through SMTP errors or log the token.
+            db.issue_password_reset(record['id'], None, None)
+            print('[auth] Password recovery delivery failed')
+
+
+def send_password_reset_email(email, token):
+    message = EmailMessage()
+    message['Subject'] = 'AI Code Mentor: password recovery'
+    message['From'] = os.environ['SMTP_FROM']
+    message['To'] = email
+    # Fragment is not sent to the web server or included in access logs.
+    message.set_content(f"Open {FRONTEND_URL}/#reset={token}\n\nThis single-use link expires in 15 minutes. If you did not request it, ignore this email.")
+    with smtplib.SMTP(os.environ['SMTP_HOST'], int(os.environ['SMTP_PORT']), timeout=15) as server:
+        server.starttls()
+        server.login(os.environ['SMTP_USER'], os.environ['SMTP_PASSWORD'])
+        server.send_message(message)
+
+
+@app.post("/auth/reset-password")
+def reset_password(body: PasswordResetConfirm):
+    if not is_strong_password(body.password):
+        raise HTTPException(400, "Use 10+ characters with upper/lowercase, number and symbol")
+    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+    if not db.reset_password(token_hash, hash_password(body.password)):
+        raise HTTPException(400, "Invalid or expired recovery link")
+    return {"message": "Password changed. Sign in again."}
 
 @app.get("/auth/me", response_model=UserResponse)
 async def me(user=Depends(current_user)):
@@ -292,7 +342,7 @@ async def delete_account(user=Depends(current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 @app.post("/authorship")
 async def authorship_check(request: CodeAnalysisRequest, user=Depends(current_user)):
@@ -316,13 +366,17 @@ async def analyze_code(request: CodeAnalysisRequest, user=Depends(current_user))
         if len(request.code) > 10000:
             raise HTTPException(status_code=400, detail="Code exceeds 10000 characters")
         
+        if not db.reserve_analysis_quota(user['id'], int(os.getenv('ANALYSES_PER_USER_PER_DAY', '20')),
+                int(os.getenv('ANALYSES_TOTAL_PER_DAY', '200'))):
+            raise HTTPException(429, "Daily analysis quota reached", headers={"Retry-After": "3600"})
         # Analyze code
         language = request.language or detect_language(request.filename or "")
         analysis_result = await analyzer.analyze(
             code=request.code,
             filename=request.filename or "code.py",
             language=language,
-            response_language=request.response_language
+            response_language=request.response_language,
+            usage_recorder=lambda rows: db.record_ai_usage(user["id"], rows)
         )
 
         if analysis_result.get("analysis_available") is False:
@@ -363,7 +417,7 @@ async def analyze_code(request: CodeAnalysisRequest, user=Depends(current_user))
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 @app.get("/history")
 async def get_history(limit: int = 10, user=Depends(current_user)):
@@ -377,7 +431,7 @@ async def get_history(limit: int = 10, user=Depends(current_user)):
             "total": len(history)
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 @app.get("/learning-videos")
 async def learning_videos(query: str = Query(..., min_length=2, max_length=200), user=Depends(current_user)):
@@ -402,7 +456,7 @@ async def get_analysis(analysis_id: str, user=Depends(current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 @app.get("/progress")
 async def get_progress(request: Request, user=Depends(current_user)):
@@ -437,7 +491,7 @@ async def get_progress(request: Request, user=Depends(current_user)):
         return stats
     except Exception as e:
         metrics.record("progress", "GET", (time.time() - start_time) * 1000, 500)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 @app.delete("/analysis/{analysis_id}")
 async def delete_analysis(analysis_id: str, user=Depends(current_user)):
@@ -453,7 +507,7 @@ async def delete_analysis(analysis_id: str, user=Depends(current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 @app.get("/stats")
 async def get_stats(user=Depends(current_user)):
@@ -464,7 +518,7 @@ async def get_stats(user=Depends(current_user)):
         stats = db.get_stats(user["id"])
         return stats
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 @app.get("/todos", response_model=list[TodoItem], dependencies=[Depends(current_user)])
 async def get_todos(status: str = Query(default="all", pattern="^(all|active|completed)$"), user=Depends(current_user)):
@@ -472,7 +526,7 @@ async def get_todos(status: str = Query(default="all", pattern="^(all|active|com
     try:
         return db.get_todos(user["id"], None if status == "all" else status)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 @app.post("/todos", response_model=TodoItem, status_code=201, dependencies=[Depends(current_user)])
 async def create_todo(todo: TodoCreate, user=Depends(current_user)):
@@ -484,7 +538,7 @@ async def create_todo(todo: TodoCreate, user=Depends(current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 @app.patch("/todos/{todo_id}", response_model=TodoItem, dependencies=[Depends(current_user)])
 async def update_todo(todo_id: str, todo: TodoUpdate, user=Depends(current_user)):
@@ -499,7 +553,7 @@ async def update_todo(todo_id: str, todo: TodoUpdate, user=Depends(current_user)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 @app.delete("/todos/{todo_id}", dependencies=[Depends(current_user)])
 async def delete_todo(todo_id: str, user=Depends(current_user)):
@@ -511,7 +565,7 @@ async def delete_todo(todo_id: str, user=Depends(current_user)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="The operation could not be completed")
 
 if __name__ == "__main__":
     # Note: reload=True only works reliably when running as a module:

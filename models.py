@@ -94,14 +94,14 @@ class StatsResponse(BaseModel):
 
 class UserRegister(BaseModel):
     """Registration request"""
-    email: str = Field(..., description="User email address")
-    password: str = Field(..., min_length=8, description="Password, minimum 8 characters")
-    display_name: Optional[str] = Field(default=None, description="Optional display name")
+    email: str = Field(..., max_length=254, description="User email address")
+    password: str = Field(..., min_length=10, max_length=256, description="Password, minimum 8 characters")
+    display_name: Optional[str] = Field(default=None, max_length=120, description="Optional display name")
 
 class UserLogin(BaseModel):
     """Login request"""
-    email: str
-    password: str
+    email: str = Field(..., max_length=254)
+    password: str = Field(..., max_length=256)
 
 class UserResponse(BaseModel):
     """Public user info (never includes password)"""
@@ -151,3 +151,12 @@ class TodoItem(BaseModel):
     completed: bool
     created_at: str
     updated_at: str
+
+
+class PasswordResetRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=254)
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(..., min_length=30, max_length=200)
+    password: str = Field(..., min_length=10, max_length=256)
