@@ -20,7 +20,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_BACKUP_TOKEN }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_BACKUP_TOKEN || secrets.TURSO_AUTH_TOKEN }}
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
         run: |
           if [ -z "$DATABASE_URL" ]; then

@@ -30,7 +30,7 @@ jobs:
       - name: Export current source and verify encrypted recovery
         env:
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_BACKUP_TOKEN }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_BACKUP_TOKEN || secrets.TURSO_AUTH_TOKEN }}
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
           REQUIRE_REMOTE_DATABASE: 'true'
         run: |
