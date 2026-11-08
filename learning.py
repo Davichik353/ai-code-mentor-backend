@@ -27,6 +27,10 @@ def init_learning_schema(conn):
             title TEXT NOT NULL, description TEXT NOT NULL, join_code TEXT NOT NULL UNIQUE,
             created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS learning_group_archives (
+            group_id TEXT PRIMARY KEY REFERENCES learning_groups(id) ON DELETE CASCADE,
+            archived_at TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS learning_members (
             group_id TEXT NOT NULL REFERENCES learning_groups(id) ON DELETE CASCADE,
             user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -106,7 +110,23 @@ class Learning:
         if not row or (row['owner_id'] != user_id and (owner_only or not c.execute(
             'SELECT 1 FROM learning_members WHERE group_id=? AND user_id=?', (group_id, user_id)).fetchone())):
             raise HTTPException(404, 'Group not found')
-        return dict(row)
+        result = dict(row)
+        result['archived'] = bool(c.execute('SELECT 1 FROM learning_group_archives WHERE group_id=?', (group_id,)).fetchone())
+        return result
+
+    @staticmethod
+    def require_active(group):
+        if group['archived']:
+            raise HTTPException(409, 'Group is archived')
+
+    def set_archived(self, group_id, user_id, archived):
+        with self.connect() as c:
+            self.group(c, group_id, user_id, owner_only=True)
+            if archived:
+                c.execute('INSERT OR IGNORE INTO learning_group_archives VALUES (?, ?)', (group_id, now()))
+            else:
+                c.execute('DELETE FROM learning_group_archives WHERE group_id=?', (group_id,))
+            return {'id': group_id, 'archived': archived}
 
     def create_group(self, user_id, data):
         with self.connect() as c:
@@ -121,7 +141,7 @@ class Learning:
 
     def groups(self, user_id):
         with self.connect() as c:
-            rows = c.execute('''SELECT g.*, (SELECT COUNT(*) FROM learning_members WHERE group_id=g.id) AS member_count
+            rows = c.execute('''SELECT g.*, EXISTS(SELECT 1 FROM learning_group_archives ar WHERE ar.group_id=g.id) AS archived, (SELECT COUNT(*) FROM learning_members WHERE group_id=g.id) AS member_count
                 FROM learning_groups g WHERE owner_id=? OR EXISTS
                 (SELECT 1 FROM learning_members m WHERE m.group_id=g.id AND m.user_id=?) ORDER BY created_at DESC''', (user_id, user_id))
             result = []
@@ -139,6 +159,8 @@ class Learning:
             row = c.execute('SELECT id, owner_id FROM learning_groups WHERE join_code=?', (code.strip(),)).fetchone()
             if not row:
                 raise HTTPException(404, 'Join code not found')
+            if c.execute('SELECT 1 FROM learning_group_archives WHERE group_id=?', (row['id'],)).fetchone():
+                raise HTTPException(409, 'Group is archived')
             if row['owner_id'] != user_id:
                 c.execute('INSERT OR IGNORE INTO learning_members VALUES (?, ?, ?)', (row['id'], user_id, now()))
             return {'id': row['id']}
@@ -194,7 +216,7 @@ class Learning:
         if template_id not in TEMPLATES:
             raise HTTPException(422, 'Unknown exercise')
         with self.connect() as c:
-            self.group(c, group_id, user_id, owner_only=True)
+            self.require_active(self.group(c, group_id, user_id, owner_only=True))
             for row in c.execute('SELECT content FROM learning_assignments WHERE group_id=?', (group_id,)):
                 if json.loads(row['content']).get('id') == template_id:
                     raise HTTPException(409, 'Exercise already assigned to this group')
@@ -220,7 +242,8 @@ class Learning:
             result = {k: v for k, v in content.items() if k not in ('solution', 'hints', 'id')}
             result.update(catalog_metadata(content))
             result.update(id=item_id, group_id=group['id'], is_owner=group['owner_id'] == user_id,
-                          can_manage=group['owner_id'] == user_id, can_submit=group['owner_id'] != user_id,
+                          can_manage=group['owner_id'] == user_id, archived=group['archived'],
+                          can_submit=group['owner_id'] != user_id and not group['archived'],
                           hints=content['hints'][:revealed], hint_count=len(content['hints']),
                           submissions=[self.serialize(r) for r in c.execute('SELECT * FROM learning_submissions WHERE assignment_id=? AND user_id=? ORDER BY created_at DESC', (item_id, user_id))])
             return result
@@ -255,6 +278,7 @@ class Learning:
     def submit(self, item_id, user_id, data):
         with self.connect() as c:
             _, content, group = self.assignment(c, item_id, user_id)
+            self.require_active(group)
             if group['owner_id'] == user_id:
                 raise HTTPException(403, 'Teacher cannot submit to own assignment')
             if len(data.results) != len(content['tests']):

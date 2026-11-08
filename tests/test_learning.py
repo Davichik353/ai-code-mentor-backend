@@ -75,6 +75,30 @@ class LearningWorkflowTests(unittest.TestCase):
         detail = self.call('GET', f'/assignments/{self.assignment}', self.student)
         self.assertEqual(detail['submissions'][0]['id'], attempt['id'])
 
+    def test_archive_permissions_preservation_and_restore(self):
+        attempt = self.submit()
+        path = f"/groups/{self.group['id']}"
+        for action in ('archive', 'restore'):
+            self.call('POST', path+'/'+action, status=401)
+            self.call('POST', path+'/'+action, self.student, {}, 404)
+            self.call('POST', path+'/'+action, self.outsider, {}, 404)
+        self.call('POST', path+'/archive', self.teacher, {})
+        self.call('POST', path+'/archive', self.teacher, {})
+        self.assertTrue(self.call('GET', '/groups', self.student)[0]['archived'])
+        self.call('POST', '/groups/join', self.outsider, {'code': self.group['join_code']}, 409)
+        self.call('POST', path+'/assignments', self.teacher, {'template_id':'sum-py'}, 409)
+        self.call('POST', f'/assignments/{self.assignment}/submissions', self.student, self.payload(), 409)
+        detail = self.call('GET', f'/assignments/{self.assignment}', self.student)
+        self.assertTrue(detail['archived'])
+        self.assertFalse(detail['can_submit'])
+        self.assertEqual(detail['submissions'][0]['id'], attempt['id'])
+        self.call('GET', f"/submissions/{attempt['id']}", self.teacher)
+        self.call('GET', path, self.outsider, status=404)
+        self.call('POST', path+'/restore', self.teacher, {})
+        self.assertFalse(self.call('GET', path, self.teacher)['archived'])
+        self.call('POST', '/groups/join', self.outsider, {'code': self.group['join_code']})
+        self.submit()
+
     def test_group_and_assignment_access_isolation(self):
         self.call('GET','/profile',status=401)
         self.call('POST','/groups',self.student,{'title':'No teacher role'},403)

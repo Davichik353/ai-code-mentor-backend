@@ -91,6 +91,14 @@ def learning_router(get_db, current_user):
             raise HTTPException(429, 'Join limit reached', headers={'Retry-After': str(info['retry_after'])})
         return store().join(user['id'], data.code)
 
+    @router.post('/groups/{group_id}/archive')
+    def archive(group_id: str, user=Depends(current_user)):
+        return store().set_archived(group_id, user['id'], True)
+
+    @router.post('/groups/{group_id}/restore')
+    def restore(group_id: str, user=Depends(current_user)):
+        return store().set_archived(group_id, user['id'], False)
+
     @router.post('/groups/{group_id}/leave')
     def leave(group_id: str, user=Depends(current_user)):
         return store().leave(group_id, user['id'])
