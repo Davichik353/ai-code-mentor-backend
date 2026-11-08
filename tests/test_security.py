@@ -49,7 +49,7 @@ class SecurityTests(ReleaseTests):
     def test_public_launch_requires_smtp_and_verification(self):
         import main
         with patch.dict(os.environ, {'PUBLIC_LAUNCH':'true','SMTP_HOST':''}):
-            with self.assertRaisesRegex(RuntimeError,'SMTP'):
+            with self.assertRaisesRegex(RuntimeError,'email delivery'):
                 with TestClient(main.app):
                     pass
 

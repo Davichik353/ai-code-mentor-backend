@@ -231,25 +231,25 @@ class Database:
         finally:
             conn.close()
 
-    def verify_user_email(self, token_hash: str) -> Optional[Dict]:
+    def verify_user_email(self, token_hash: str, email: str) -> Optional[Dict]:
         conn = connect(self.db_path)
         conn.row_factory = sqlite3.Row
         try:
             row = conn.execute(
                 '''SELECT * FROM users
-                   WHERE verification_token_hash = ?
+                   WHERE verification_token_hash = ? AND email = ?
                    AND verification_expires_at > ?''',
-                (token_hash, datetime.now().isoformat())
+                (token_hash, email, datetime.now().isoformat())
             ).fetchone()
             if not row:
                 return None
-            conn.execute(
+            updated = conn.execute(
                 '''UPDATE users SET email_verified = 1,
                    verification_token_hash = NULL, verification_expires_at = NULL
-                   WHERE id = ?''', (row["id"],)
+                   WHERE id = ? AND verification_token_hash = ?''', (row["id"], token_hash)
             )
             conn.commit()
-            return self.get_user_by_email(row["email"])
+            return self.get_user_by_email(row["email"]) if updated.rowcount == 1 else None
         finally:
             conn.close()
     

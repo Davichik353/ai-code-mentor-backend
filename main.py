@@ -32,9 +32,8 @@ from migrations import run_migrations
 from health import get_health_checker
 import hashlib
 import secrets
-import smtplib
+from mail_delivery import smtp_configured, mail_configured, send_mail
 from datetime import timedelta
-from email.message import EmailMessage
 
 # Initialize database and analyzer
 db = Database()
@@ -67,14 +66,12 @@ def current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     user = db.get_user_by_id(payload["sub"]) if payload and payload.get("sub") else None
     if not user or payload.get("ver", 0) != user.get("token_version", 0):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if require_email_verification() and not user["email_verified"]:
+        raise HTTPException(status_code=403, detail="Verify your email before signing in")
     return user
 
 def detect_language(filename: str) -> str:
     return LANGUAGE_BY_EXTENSION.get(os.path.splitext(filename or "")[1].lower(), "source code")
-
-def smtp_configured() -> bool:
-    required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"]
-    return all(os.getenv(key) for key in required)
 
 def require_email_verification() -> bool:
     flag = os.getenv("REQUIRE_EMAIL_VERIFICATION")
@@ -83,21 +80,10 @@ def require_email_verification() -> bool:
     return smtp_configured()
 
 def send_verification_email(email: str, token: str):
-    required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"]
-    if any(not os.getenv(key) for key in required):
-        raise RuntimeError("Email verification is enabled but SMTP is not configured")
-    message = EmailMessage()
-    message["Subject"] = "Verify your AI Code Mentor account"
-    message["From"] = os.environ["SMTP_FROM"]
-    message["To"] = email
-    message.set_content(
-        f"Your verification code is: {token}\n\n"
-        "This code expires in 30 minutes. If you did not register, ignore this email."
-    )
-    with smtplib.SMTP(os.environ["SMTP_HOST"], int(os.environ["SMTP_PORT"]), timeout=15) as server:
-        server.starttls()
-        server.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])
-        server.send_message(message)
+    send_mail(email, 'AI Code Mentor: подтверждение почты',
+        f'Ваш код подтверждения: {token}\n\n'
+        'Введите его на сайте AI Code Mentor. Код действует 30 минут. '
+        'Если вы не регистрировались, проигнорируйте письмо.')
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -118,10 +104,10 @@ async def lifespan(app: FastAPI):
     if not os.getenv("JWT_SECRET"):
         print("[main] WARNING: JWT_SECRET is not set — logins will be invalidated on every restart")
     if os.getenv("PUBLIC_LAUNCH", "false").lower() == "true":
-        if not smtp_configured() or not require_email_verification():
-            raise RuntimeError("Public launch requires SMTP and email verification")
+        if not mail_configured() or not require_email_verification():
+            raise RuntimeError("Public launch requires email delivery and email verification")
     if not require_email_verification():
-        print("[main] Email verification is OFF (demo mode). Set REQUIRE_EMAIL_VERIFICATION=true after SMTP works.")
+        print("[main] Email verification is OFF (demo mode). Set REQUIRE_EMAIL_VERIFICATION=true after email delivery works.")
 
     print("[startup] Performance optimizations initialized")
     print(f"[startup] Cache stats: {cache.stats()}")
@@ -185,6 +171,9 @@ async def health_check():
     """
     health_checker = get_health_checker(db.db_path)
     health_data = health_checker.get_health_status()
+    health_data['email_delivery'] = {'configured': mail_configured(),
+        'provider': 'brevo' if os.getenv('BREVO_API_KEY', '').strip() else 'smtp',
+        'verification_required': require_email_verification()}
     health_data['database_maintenance'] = os.getenv('DATABASE_MAINTENANCE', '').lower() == 'true'
     status_code = 200 if health_data["status"] == "healthy" else 503
     return JSONResponse(content=health_data, status_code=status_code)
@@ -257,7 +246,7 @@ async def register(user: UserRegister, request: Request):
 async def verify_email(email: str, code: str):
     if not is_valid_email(email) or not code or len(code) < 10:
         raise HTTPException(status_code=400, detail="Invalid verification details")
-    user = db.verify_user_email(hashlib.sha256(code.encode()).hexdigest())
+    user = db.verify_user_email(hashlib.sha256(code.encode()).hexdigest(), email.lower().strip())
     if not user or user["email"].lower() != email.lower().strip():
         raise HTTPException(status_code=400, detail="Invalid or expired verification code")
     return TokenResponse(access_token=create_access_token(user["id"], user["email"], user["token_version"]), user=UserResponse(**db.get_user_by_id(user["id"])))
@@ -279,7 +268,7 @@ def login(user: UserLogin):
 
 @app.post("/auth/forgot-password")
 def forgot_password(body: PasswordResetRequest, background_tasks: BackgroundTasks):
-    if not smtp_configured():
+    if not mail_configured():
         raise HTTPException(503, "Password recovery is temporarily unavailable")
     email = body.email.strip().lower()
     identity = hashlib.sha256(email.encode()).hexdigest()
@@ -307,16 +296,10 @@ def deliver_password_recovery(email):
 
 
 def send_password_reset_email(email, token):
-    message = EmailMessage()
-    message['Subject'] = 'AI Code Mentor: password recovery'
-    message['From'] = os.environ['SMTP_FROM']
-    message['To'] = email
-    # Fragment is not sent to the web server or included in access logs.
-    message.set_content(f"Open {FRONTEND_URL}/#reset={token}\n\nThis single-use link expires in 15 minutes. If you did not request it, ignore this email.")
-    with smtplib.SMTP(os.environ['SMTP_HOST'], int(os.environ['SMTP_PORT']), timeout=15) as server:
-        server.starttls()
-        server.login(os.environ['SMTP_USER'], os.environ['SMTP_PASSWORD'])
-        server.send_message(message)
+    send_mail(email, 'AI Code Mentor: восстановление доступа',
+        f'Откройте {FRONTEND_URL}/#reset={token}\n\n'
+        'Одноразовая ссылка действует 15 минут. '
+        'Если вы не запрашивали смену пароля, проигнорируйте письмо.')
 
 
 @app.post("/auth/reset-password")
