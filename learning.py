@@ -143,6 +143,16 @@ class Learning:
                 c.execute('INSERT OR IGNORE INTO learning_members VALUES (?, ?, ?)', (row['id'], user_id, now()))
             return {'id': row['id']}
 
+    def leave(self, group_id, user_id):
+        with self.connect() as c:
+            group = self.group(c, group_id, user_id)
+            if group['owner_id'] == user_id:
+                raise HTTPException(409, 'Group owner cannot leave')
+            # Keep submitted work for teacher review and a possible later rejoin.
+            c.execute('DELETE FROM learning_members WHERE group_id=? AND user_id=?',
+                      (group_id, user_id))
+            return {'left': True}
+
     def group_detail(self, group_id, user_id):
         with self.connect() as c:
             group = self.group(c, group_id, user_id)

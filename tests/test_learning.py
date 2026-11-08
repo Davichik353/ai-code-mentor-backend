@@ -57,6 +57,24 @@ class LearningWorkflowTests(unittest.TestCase):
     def submit(self,passed=True):
         return self.call('POST',f'/assignments/{self.assignment}/submissions',self.student,self.payload(passed),201)
 
+    def test_leave_group_revokes_access_preserves_work_and_allows_rejoin(self):
+        attempt = self.submit()
+        path = f"/groups/{self.group['id']}"
+        self.call('POST', path+'/leave', status=401)
+        self.call('POST', path+'/leave', self.outsider, {}, 404)
+        self.call('POST', path+'/leave', self.teacher, {}, 409)
+        self.call('POST', path+'/leave', self.student, {})
+        self.assertEqual(self.call('GET', '/groups', self.student), [])
+        self.call('GET', path, self.student, status=404)
+        self.call('GET', f'/assignments/{self.assignment}', self.student, status=404)
+        self.call('POST', f'/assignments/{self.assignment}/submissions', self.student, self.payload(), 404)
+        detail = self.call('GET', path, self.teacher)
+        self.assertEqual(detail['members'], [])
+        self.assertEqual(detail['submissions'][0]['id'], attempt['id'])
+        self.call('POST', '/groups/join', self.student, {'code': self.group['join_code']})
+        detail = self.call('GET', f'/assignments/{self.assignment}', self.student)
+        self.assertEqual(detail['submissions'][0]['id'], attempt['id'])
+
     def test_group_and_assignment_access_isolation(self):
         self.call('GET','/profile',status=401)
         self.call('POST','/groups',self.student,{'title':'No teacher role'},403)
