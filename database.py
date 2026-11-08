@@ -203,6 +203,14 @@ class Database:
             print(f"Error looking up user: {e}")
             return None
 
+    def update_display_name(self, user_id, display_name):
+        conn = connect(self.db_path)
+        try:
+            conn.execute("UPDATE users SET display_name=? WHERE id=?", (display_name, user_id))
+            conn.commit()
+        finally:
+            conn.close()
+
     def delete_user(self, user_id: str) -> bool:
         conn = connect(self.db_path)
         conn.execute("PRAGMA foreign_keys=ON")

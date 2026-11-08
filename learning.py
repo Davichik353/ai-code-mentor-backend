@@ -59,6 +59,16 @@ def init_learning_schema(conn):
     ''')
 
 
+def catalog_metadata(content):
+    """Enrich older assignment snapshots without modifying their stored content."""
+    current = TEMPLATES.get(content.get('id'), {})
+    defaults = {
+        'category': 'basics', 'category_title': {'ru': 'Основы', 'uz': 'Asoslar'},
+        'difficulty': 'beginner', 'difficulty_title': {'ru': 'Новичок', 'uz': 'Boshlovchi'},
+    }
+    return {key: content.get(key) or current.get(key) or value for key, value in defaults.items()}
+
+
 class Learning:
     def __init__(self, path):
         self.path = path
@@ -118,6 +128,7 @@ class Learning:
             for row in rows:
                 item = dict(row)
                 item['is_owner'] = item['owner_id'] == user_id
+                item['can_manage'] = item['is_owner']
                 if not item['is_owner']:
                     item.pop('join_code')
                 result.append(item)
@@ -137,12 +148,15 @@ class Learning:
             group = self.group(c, group_id, user_id)
             owner = group['owner_id'] == user_id
             group['is_owner'] = owner
+            group['can_manage'] = owner
             if not owner:
                 group.pop('join_code')
             group['assignments'] = []
             for row in c.execute('SELECT * FROM learning_assignments WHERE group_id=? ORDER BY created_at DESC', (group_id,)):
                 content = json.loads(row['content'])
-                group['assignments'].append({'id': row['id'], 'title': content['title'], 'language': content['language']})
+                item = {'id': row['id'], 'template_id': content.get('id'), 'title': content['title'], 'language': content['language']}
+                item.update(catalog_metadata(content))
+                group['assignments'].append(item)
             if owner:
                 group['members'] = [dict(r) for r in c.execute('''SELECT u.id, u.display_name FROM learning_members m
                     JOIN users u ON u.id=m.user_id WHERE group_id=? ORDER BY joined_at''', (group_id,))]
@@ -171,6 +185,9 @@ class Learning:
             raise HTTPException(422, 'Unknown exercise')
         with self.connect() as c:
             self.group(c, group_id, user_id, owner_only=True)
+            for row in c.execute('SELECT content FROM learning_assignments WHERE group_id=?', (group_id,)):
+                if json.loads(row['content']).get('id') == template_id:
+                    raise HTTPException(409, 'Exercise already assigned to this group')
             if c.execute('SELECT COUNT(*) FROM learning_assignments WHERE group_id=?', (group_id,)).fetchone()[0] >= 100:
                 raise HTTPException(409, 'Assignment limit reached')
             item_id = secrets.token_hex(12)
@@ -191,7 +208,9 @@ class Learning:
             progress = c.execute('SELECT revealed FROM learning_hints WHERE assignment_id=? AND user_id=?', (item_id, user_id)).fetchone()
             revealed = progress['revealed'] if progress else 0
             result = {k: v for k, v in content.items() if k not in ('solution', 'hints', 'id')}
+            result.update(catalog_metadata(content))
             result.update(id=item_id, group_id=group['id'], is_owner=group['owner_id'] == user_id,
+                          can_manage=group['owner_id'] == user_id, can_submit=group['owner_id'] != user_id,
                           hints=content['hints'][:revealed], hint_count=len(content['hints']),
                           submissions=[self.serialize(r) for r in c.execute('SELECT * FROM learning_submissions WHERE assignment_id=? AND user_id=? ORDER BY created_at DESC', (item_id, user_id))])
             return result
@@ -257,7 +276,8 @@ class Learning:
                 raise HTTPException(404, 'Submission not found')
             result = self.serialize(row)
             result.update(title=content['title'], defense_questions=content['defense_questions'], change=content['change'],
-                          tests=content['tests'], group_id=group['id'], is_owner=group['owner_id'] == user_id)
+                          tests=content['tests'], group_id=group['id'], is_owner=group['owner_id'] == user_id,
+                          can_manage=group['owner_id'] == user_id)
             return result
 
     def review(self, submission_id, user_id, data):
@@ -268,6 +288,8 @@ class Learning:
             self.assignment(c, row['assignment_id'], user_id)
             group_id = c.execute('SELECT group_id FROM learning_assignments WHERE id=?', (row['assignment_id'],)).fetchone()[0]
             self.group(c, group_id, user_id, owner_only=True)
+            if row['user_id'] == user_id:
+                raise HTTPException(403, 'Cannot review your own work')
             if data.decision == 'approved' and not row['tests_passed']:
                 raise HTTPException(409, 'Cannot approve failing tests')
             c.execute('UPDATE learning_submissions SET status=?, feedback=?, reviewed_at=? WHERE id=?',

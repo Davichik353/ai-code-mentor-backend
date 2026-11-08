@@ -16,7 +16,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 from models import (
     CodeAnalysisRequest, CodeAnalysisResponse, AnalysisItem, FeedbackItem,
     TodoCreate, TodoUpdate, TodoItem, UserRegister, UserLogin, TokenResponse, UserResponse,
-    RegistrationResponse, PasswordResetRequest, PasswordResetConfirm
+    RegistrationResponse, PasswordResetRequest, PasswordResetConfirm, ProfileUpdateRequest
 )
 from claude_analyzer import CodeAnalyzer
 from database import Database
@@ -330,6 +330,15 @@ def reset_password(body: PasswordResetConfirm):
 @app.get("/auth/me", response_model=UserResponse)
 async def me(user=Depends(current_user)):
     return UserResponse(**user)
+
+@app.patch("/auth/profile", response_model=UserResponse)
+def update_account_profile(body: ProfileUpdateRequest, user=Depends(current_user)):
+    name = (body.display_name or '').strip()
+    if any(ord(char) < 32 for char in name):
+        raise HTTPException(400, "Name contains invalid characters")
+    db.update_display_name(user['id'], name or None)
+    return UserResponse(**db.get_user_by_id(user['id']))
+
 
 @app.delete("/auth/account")
 async def delete_account(user=Depends(current_user)):

@@ -1,7 +1,7 @@
 from typing import Literal, Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, StringConstraints
-from learning import Learning
+from learning import Learning, catalog_metadata
 from learning_content import TEMPLATES, GLOSSARY
 from performance import RateLimiter
 
@@ -69,7 +69,8 @@ def learning_router(get_db, current_user):
 
     @router.get('/templates')
     def templates(user=Depends(current_user)):
-        return [{k: item[k] for k in ('id', 'title', 'prompt', 'language')} for item in TEMPLATES.values()]
+        fields = ('id', 'title', 'prompt', 'language', 'category', 'category_title', 'difficulty', 'difficulty_title')
+        return [{**{k: item[k] for k in fields if k in item}, **catalog_metadata(item)} for item in TEMPLATES.values()]
 
     @router.get('/glossary')
     def glossary(user=Depends(current_user)):

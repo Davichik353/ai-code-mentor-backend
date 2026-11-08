@@ -10,6 +10,8 @@ os.environ['REQUIRE_EMAIL_VERIFICATION']='false'
 from fastapi.testclient import TestClient
 import main
 from database import Database
+from learning import Learning
+from learning_content import TEMPLATES
 
 
 class LearningWorkflowTests(unittest.TestCase):
@@ -68,8 +70,61 @@ class LearningWorkflowTests(unittest.TestCase):
         self.call('POST','/profile',self.outsider,{'role':'teacher'})
         self.call('POST',f"/groups/{self.group['id']}/assignments",self.outsider,{'template_id':'sum-py'},404)
         templates=self.call('GET','/templates',self.student)
-        self.assertEqual(len(templates),6)
+        self.assertEqual(len(templates),len(TEMPLATES))
+        self.assertTrue(all(all(k in t for k in ("category", "category_title", "difficulty", "difficulty_title")) for t in templates))
         self.assertNotIn('solution',str(templates)); self.assertNotIn('hints',str(templates))
+
+    def test_joined_member_cannot_manage_group_even_after_switching_profile_role(self):
+        attempt=self.submit()
+        self.call('POST','/profile',self.student,{'role':'teacher'})
+        # A teacher workspace lets this account create a separate group, not administer its teacher's group.
+        own=self.call('POST','/groups',self.student,{'title':'My separate group'},201)
+        self.call('POST',f"/groups/{own['id']}/assignments",self.student,{'template_id':'maximum-py'},201)
+        detail=self.call('GET',f"/groups/{self.group['id']}",self.student)
+        self.assertFalse(detail['is_owner'])
+        self.assertFalse(detail['can_manage'])
+        for key in ('join_code','members','submissions','summary'):
+            self.assertNotIn(key,detail)
+        self.call('POST',f"/groups/{self.group['id']}/assignments",self.student,{'template_id':'maximum-py'},404)
+        self.call('POST',f"/submissions/{attempt['id']}/review",self.student,
+                  {'decision':'approved','feedback':'I cannot approve my own solution in another group.'},404)
+        item=self.call('GET',f'/assignments/{self.assignment}',self.student)
+        self.assertTrue(item['can_submit'])
+        self.assertFalse(item['can_manage'])
+        # Group permissions derive from ownership, even if its owner changes the global workspace mode.
+        self.call('POST','/profile',self.teacher,{'role':'learner'})
+        owner=self.call('GET',f"/groups/{self.group['id']}",self.teacher)
+        self.assertTrue(owner['can_manage'])
+        item=self.call('GET',f'/assignments/{self.assignment}',self.teacher)
+        self.assertFalse(item['can_submit'])
+        self.assertTrue(item['can_manage'])
+        self.assertIn('starter_code',item)
+
+    def test_duplicate_template_is_not_assigned_twice(self):
+        self.call('POST',f"/groups/{self.group['id']}/assignments",self.teacher,{'template_id':'sum-js'},409)
+        items=self.call('GET',f"/groups/{self.group['id']}",self.teacher)['assignments']
+        self.assertEqual(len(items),1)
+        self.assertEqual(items[0]['template_id'],'sum-js')
+        # A different language is a different exercise; another group can use the same exercise.
+        self.call('POST',f"/groups/{self.group['id']}/assignments",self.teacher,{'template_id':'sum-py'},201)
+        other=self.call('POST','/groups',self.teacher,{'title':'Another group'},201)
+        self.call('POST',f"/groups/{other['id']}/assignments",self.teacher,{'template_id':'sum-js'},201)
+
+    def test_legacy_assignment_metadata_is_added_without_rewriting_snapshot(self):
+        with Learning(self.db.db_path).connect() as c:
+            import json
+            original=c.execute('SELECT content FROM learning_assignments WHERE id=?',(self.assignment,)).fetchone()[0]
+            content=json.loads(original)
+            for name in ('category','category_title','difficulty','difficulty_title'):
+                content.pop(name,None)
+            snapshot=json.dumps(content)
+            c.execute('UPDATE learning_assignments SET content=? WHERE id=?',(snapshot,self.assignment))
+        item=self.call('GET',f'/assignments/{self.assignment}',self.student)
+        self.assertIn('category',item)
+        listing=self.call('GET',f"/groups/{self.group['id']}",self.student)['assignments']
+        self.assertIn('difficulty',listing[0])
+        with Learning(self.db.db_path).connect() as c:
+            self.assertEqual(c.execute('SELECT content FROM learning_assignments WHERE id=?',(self.assignment,)).fetchone()[0],snapshot)
 
     def test_hints_are_progressive_and_example_requires_reflection(self):
         path=f'/assignments/{self.assignment}'
@@ -149,4 +204,6 @@ class LearningWorkflowTests(unittest.TestCase):
         self.assertEqual(p['locale'],'uz')
         detail=self.call('GET',f'/assignments/{self.assignment}',self.student)
         self.assertTrue(detail['prompt']['ru']); self.assertTrue(detail['prompt']['uz'])
-        self.assertEqual(len(self.call('GET','/glossary',self.student)),5)
+        glossary=self.call('GET','/glossary',self.student)
+        self.assertGreaterEqual(len(glossary),40)
+        self.assertTrue(all(item.get('title',{}).get('ru') and item.get('title',{}).get('uz') and item.get('examples') for item in glossary))

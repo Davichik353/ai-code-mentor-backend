@@ -160,3 +160,9 @@ class PasswordResetRequest(BaseModel):
 class PasswordResetConfirm(BaseModel):
     token: str = Field(..., min_length=30, max_length=200)
     password: str = Field(..., min_length=10, max_length=256)
+
+
+class ProfileUpdateRequest(BaseModel):
+    display_name: Optional[str] = Field(default=None, max_length=120)
+
+    model_config = {"extra": "forbid"}
