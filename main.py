@@ -185,6 +185,7 @@ async def health_check():
     """
     health_checker = get_health_checker(db.db_path)
     health_data = health_checker.get_health_status()
+    health_data['database_maintenance'] = os.getenv('DATABASE_MAINTENANCE', '').lower() == 'true'
     status_code = 200 if health_data["status"] == "healthy" else 503
     return JSONResponse(content=health_data, status_code=status_code)
 

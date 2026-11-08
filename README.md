@@ -37,7 +37,7 @@ uvicorn main:app --host 127.0.0.1 --port 8000
 python3 -m http.server 8080
 ```
 
-SQLite по умолчанию хранится в `~/.local/share/ai-code-mentor/code_mentor.db`, вне checkout. Можно указать абсолютный `DATABASE_PATH` вне репозитория. В Render используется удалённая Turso: задайте `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `REQUIRE_REMOTE_DATABASE=true`. Для используемой в проекте базы укажите URL с префиксом **`turso://`**: он выбирает драйвер `turso_serverless`. Префикс **`libsql://`** выбирает драйвер `libsql` и предназначен для совместимой базы libSQL. Префиксы не взаимозаменяемы: используйте URL, выданный для конкретной базы. PostgreSQL этим приложением не используется.
+SQLite по умолчанию хранится в `~/.local/share/ai-code-mentor/code_mentor.db`, вне checkout. Можно указать абсолютный `DATABASE_PATH` вне репозитория. В Render используется удалённая Turso: задайте `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `REQUIRE_REMOTE_DATABASE=true`. Для используемой в проекте базы укажите URL с префиксом **`turso://`**: он выбирает драйвер `turso_serverless`. Префикс **`libsql://`** выбирает драйвер `libsql` и предназначен для совместимой базы libSQL. Префиксы не взаимозаменяемы: используйте URL, выданный для конкретной базы. Поддержка PostgreSQL/Supabase включается через защищённый `DATABASE_URL` после проверенного переноса данных. Инструкция: [POSTGRES_MIGRATION.md](POSTGRES_MIGRATION.md). Не добавляйте URL новой пустой базы в production до переноса.
 
 ## Проверки
 

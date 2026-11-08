@@ -2,6 +2,7 @@
 import os
 import secrets
 import sqlite3
+from storage import connect
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -236,7 +237,7 @@ class LearningWorkflowTests(unittest.TestCase):
         group=self.call('GET',f"/groups/{self.group['id']}",self.teacher)
         self.assertEqual(group['members'],[])
         self.assertEqual(self.client.delete('/auth/account',headers=self.teacher).status_code,200)
-        with sqlite3.connect(self.db.db_path) as c:
+        with connect(self.db.db_path) as c:
             for table in ('learning_groups','learning_assignments','learning_members','learning_submissions'):
                 self.assertEqual(c.execute('SELECT COUNT(*) FROM '+table).fetchone()[0],0)
 

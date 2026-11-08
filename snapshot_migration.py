@@ -13,7 +13,8 @@ import sqlite3
 
 TABLES = ('users', 'analyses', 'feedback_cache', 'todos', 'learning_profiles',
           'learning_groups', 'learning_members', 'learning_assignments',
-          'learning_hints', 'learning_submissions')
+          'learning_hints', 'learning_submissions', 'learning_group_archives',
+          'analysis_quotas', 'ai_usage')
 CORE = ('users', 'analyses', 'feedback_cache', 'todos')
 
 
@@ -26,6 +27,8 @@ def quote(name):
 
 
 def table_names(conn):
+    if getattr(conn, 'backend', '') == 'postgresql':
+        return [r[0] for r in conn.execute("SELECT tablename FROM pg_tables WHERE schemaname='mentor'").fetchall()]
     return [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT GLOB '__turso_internal_*'").fetchall()]
 
 
@@ -110,6 +113,6 @@ def migrate_snapshot(path, target, prepare_target, expected_sha256=None):
                 for row in src.execute('SELECT ' + fields + ' FROM ' + quote(name)):
                     target.execute(insert, tuple(row))
             _verify(src, target, info['row_counts'])
-            if target.execute('PRAGMA foreign_key_check').fetchall():
+            if getattr(target, 'backend', '') != 'postgresql' and target.execute('PRAGMA foreign_key_check').fetchall():
                 raise MigrationError('Target foreign-key verification failed')
     return {**info, 'verified': True, 'already_present': False}

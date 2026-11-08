@@ -18,12 +18,15 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Back up and verify recovery
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_BACKUP_TOKEN }}
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
         run: |
-          test -n "$TURSO_DATABASE_URL"
-          test -n "$TURSO_AUTH_TOKEN"
+          if [ -z "$DATABASE_URL" ]; then
+            test -n "$TURSO_DATABASE_URL"
+            test -n "$TURSO_AUTH_TOKEN"
+          fi
           python scripts/backup_database.py backup --output "$RUNNER_TEMP/database.fernet"
           python scripts/backup_database.py restore --source "$RUNNER_TEMP/database.fernet" --output "$RUNNER_TEMP/restore-check.sqlite3"
           rm "$RUNNER_TEMP/restore-check.sqlite3"

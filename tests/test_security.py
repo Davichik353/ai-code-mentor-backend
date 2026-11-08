@@ -99,6 +99,17 @@ class SecurityTests(ReleaseTests):
 
 
 class MiddlewareTests(unittest.TestCase):
+    def test_migration_maintenance_blocks_api_but_preserves_health(self):
+        async def endpoint(request): return JSONResponse({'ok':True})
+        app=Starlette(routes=[Route('/health',endpoint), Route('/anything',endpoint,methods=['GET','POST'])])
+        app.add_middleware(RequestSecurity)
+        with TestClient(app) as c, patch.dict(os.environ, {'DATABASE_MAINTENANCE':'true'}):
+            self.assertEqual(c.get('/health').status_code,200)
+            self.assertEqual(c.get('/anything').status_code,503)
+            self.assertEqual(c.post('/anything').status_code,503)
+        with TestClient(app) as c, patch.dict(os.environ, {'DATABASE_MAINTENANCE':'false'}):
+            self.assertEqual(c.post('/anything').status_code,200)
+
     def test_all_routes_limited_and_forwarded_header_cannot_bypass(self):
         async def endpoint(request):return JSONResponse({'ok':True})
         app=Starlette(routes=[Route('/anything',endpoint,methods=['GET','POST'])])

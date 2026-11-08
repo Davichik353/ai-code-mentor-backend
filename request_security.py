@@ -14,6 +14,9 @@ class RequestSecurity:
     async def __call__(self, scope, receive, send):
         if scope['type'] != 'http' or scope['method'] == 'OPTIONS':
             return await self.app(scope, receive, send)
+        if os.getenv('DATABASE_MAINTENANCE', '').lower() == 'true' and scope['path'] != '/health':
+            return await JSONResponse({'detail': 'Database migration in progress. Please try again later.'}, 503,
+                headers={'Retry-After': '120'})(scope, receive, send)
         identity = (scope.get('client') or ('unknown',))[0]
         # Never trust caller-supplied X-Forwarded-For. Configure trusted proxies in Uvicorn.
         for limiter in [self.general] + ([self.auth] if scope['path'].startswith('/auth/') else []):

@@ -8,7 +8,7 @@ Provides:
 """
 
 import sqlite3
-from storage import connect, remote_enabled
+from storage import connect, remote_enabled, backend_name
 import psutil
 import time
 import os
@@ -90,7 +90,7 @@ class HealthChecker:
                 "status": "ok",
                 "response_time_ms": round(response_time, 2),
                 "details": "Database responding normally",
-                "backend": "turso" if remote_enabled() else "sqlite"
+                "backend": backend_name()
             }
 
         except Exception as e:

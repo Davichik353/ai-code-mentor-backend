@@ -1,4 +1,4 @@
-"""Connection factory: local SQLite, or remote Turso/libSQL selected by URL.
+"""Connection factory: PostgreSQL, Turso/libSQL, or local SQLite.
 
 Remote mode uses the primary database directly; no disposable local replica is
 used on Render. Keep tokens in environment settings, never in the database URL.
@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 
 def remote_enabled():
-    return bool(os.getenv('TURSO_DATABASE_URL', '').strip())
+    return bool(os.getenv('DATABASE_URL', '').strip() or os.getenv('TURSO_DATABASE_URL', '').strip())
 
 
 def _call(operation, *args, **kwargs):
@@ -124,7 +124,20 @@ class Connection:
         return _call(self._connection.__exit__, exception_type, exception, traceback)
 
 
+def backend_name():
+    if os.getenv('DATABASE_URL', '').strip():
+        return 'postgresql'
+    return 'turso' if remote_enabled() else 'sqlite'
+
+
 def connect(path, timeout=5.0):
+    postgres = os.getenv('DATABASE_URL', '').strip()
+    if postgres:
+        if urlparse(postgres).scheme not in ('postgresql', 'postgres'):
+            raise RuntimeError('DATABASE_URL must use postgresql:// or postgres://')
+        from postgres_storage import Connection as PostgresConnection
+        return PostgresConnection(postgres, timeout)
+
     url = os.getenv('TURSO_DATABASE_URL', '').strip()
     required = os.getenv('REQUIRE_REMOTE_DATABASE', '').lower() in ('true', '1', 'yes')
     if not url:

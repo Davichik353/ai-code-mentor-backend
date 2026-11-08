@@ -4,7 +4,7 @@ from storage import connect
 from contextlib import closing
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 import uuid
 from learning import init_learning_schema
@@ -20,6 +20,9 @@ class Database:
         """Initialize database with tables"""
         try:
             conn = connect(self.db_path)
+            if getattr(conn, 'backend', '') == 'postgresql':
+                conn.execute('CREATE SCHEMA IF NOT EXISTS mentor')
+                conn.execute('REVOKE ALL ON SCHEMA mentor FROM PUBLIC')
             cursor = conn.cursor()
             
             # Users table
@@ -278,11 +281,11 @@ class Database:
         try:
             for scope, limit in [("all", global_limit), (hashlib.sha256(user_id.encode()).hexdigest(), user_limit)]:
                 cursor = conn.execute("""INSERT INTO analysis_quotas(scope,day,count) VALUES(?,?,1)
-                    ON CONFLICT(scope,day) DO UPDATE SET count=count+1 WHERE count<?""", (scope, day, limit))
+                    ON CONFLICT(scope,day) DO UPDATE SET count=analysis_quotas.count+1 WHERE analysis_quotas.count<?""", (scope, day, limit))
                 if cursor.rowcount != 1:
                     conn.rollback()
                     return False
-            conn.execute("DELETE FROM analysis_quotas WHERE day < date(?, '-2 days')", (day,))
+            conn.execute("DELETE FROM analysis_quotas WHERE day < ?", ((datetime.utcnow().date() - timedelta(days=2)).isoformat(),))
             conn.commit()
             return True
         finally:

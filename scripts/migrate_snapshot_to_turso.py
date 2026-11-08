@@ -23,8 +23,8 @@ def main():
     if not (args.apply or args.verify):
         print(json.dumps({**report, 'mode': 'source-preflight-only'}, indent=2))
         return 0
-    from storage import connect, remote_enabled
-    if not remote_enabled() or not os.getenv('TURSO_AUTH_TOKEN'):
+    from storage import connect, backend_name
+    if backend_name() != 'turso' or not os.getenv('TURSO_AUTH_TOKEN'):
         raise RuntimeError('Configure TURSO_DATABASE_URL and TURSO_AUTH_TOKEN securely first')
     from database import Database
     from migrations import run_migrations
