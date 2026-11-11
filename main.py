@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import json
 import os
@@ -399,7 +399,7 @@ async def analyze_code(request: CodeAnalysisRequest, user=Depends(current_user))
         response = CodeAnalysisResponse(
             id=analysis_id,
             score=score,
-            timestamp=datetime.now().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             feedback=analysis_result,
             mentor_hints=analyzer.generate_hints(analysis_result),
             summary=analysis_result.get("summary", "")

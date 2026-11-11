@@ -4,7 +4,7 @@ from storage import connect
 from contextlib import closing
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict
 import uuid
 from learning import init_learning_schema
@@ -310,7 +310,7 @@ class Database:
             
             analysis_id = f"analysis_{uuid.uuid4().hex[:12]}"
             feedback_json = json.dumps(feedback, ensure_ascii=False)
-            timestamp = datetime.now().isoformat()
+            timestamp = datetime.now(timezone.utc).isoformat()
             
             cursor.execute('''
                 INSERT INTO analyses (id, user_id, filename, code, feedback, score, timestamp)
