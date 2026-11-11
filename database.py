@@ -186,19 +186,20 @@ class Database:
                 stats_conn = connect(self.db_path)
                 stats_cur = stats_conn.cursor()
                 stats_cur.execute('''
-                    SELECT COUNT(*) as count, AVG(score) as avg_score
+                    SELECT COUNT(*) as count
                     FROM analyses
                     WHERE user_id = ? AND feedback NOT LIKE '%AI analysis unavailable%'
                 ''', (user_id,))
                 stats = stats_cur.fetchone()
                 analysis_count = stats[0] or 0
-                avg_score = stats[1] or 0
                 stats_conn.close()
 
-                # Level formula: 1 + (analyses / 10), XP: analyses * 10 + avg_score
-                user_dict['level'] = 1 + (analysis_count // 10)
-                user_dict['xp_current'] = analysis_count * 10 + int(avg_score)
-                user_dict['xp_needed'] = (user_dict['level'] + 1) * 1000
+                # A fixed reward never decreases when a later code score is lower.
+                total_xp = analysis_count * 10
+                user_dict['level'] = 1 + total_xp // 1000
+                user_dict['xp_current'] = total_xp % 1000
+                user_dict['xp_needed'] = 1000
+                user_dict['xp_total'] = total_xp
 
                 return user_dict
             return None
