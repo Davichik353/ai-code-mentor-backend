@@ -35,6 +35,17 @@ class LearningWorkflowTests(unittest.TestCase):
         self.call('POST','/groups/join',self.student,{'code':self.group['join_code']})
         self.assignment=self.call('POST',f"/groups/{self.group['id']}/assignments",self.teacher,{'template_id':'sum-js'},201)['id']
 
+    def test_paste_report_is_saved_and_visible_to_teacher_only(self):
+        payload = {**self.payload(), 'code_paste_detected': True}
+        attempt = self.call('POST', f'/assignments/{self.assignment}/submissions', self.student, payload, 201)
+        self.assertTrue(attempt['code_paste_detected'])
+        for user in (self.teacher, self.student):
+            detail = self.call('GET', f"/submissions/{attempt['id']}", user)
+            self.assertTrue(detail['code_paste_detected'])
+        self.call('GET', f"/submissions/{attempt['id']}", self.outsider, status=404)
+        clean = self.submit()
+        self.assertFalse(self.call('GET', f"/submissions/{clean['id']}", self.teacher)['code_paste_detected'])
+
     def test_board_exposes_only_own_latest_attempt_data(self):
         self.call('POST','/groups/join',self.outsider,{'code':self.group['join_code']})
         mine=self.call('POST',f"/assignments/{self.assignment}/submissions",self.student,self.payload(),201)

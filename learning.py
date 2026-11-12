@@ -55,6 +55,10 @@ def init_learning_schema(conn):
             status TEXT NOT NULL DEFAULT 'pending_review', feedback TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL, reviewed_at TEXT
         );
+        CREATE TABLE IF NOT EXISTS learning_submission_input_reports (
+            submission_id TEXT PRIMARY KEY REFERENCES learning_submissions(id) ON DELETE CASCADE,
+            code_paste_detected INTEGER NOT NULL DEFAULT 0
+        );
         CREATE INDEX IF NOT EXISTS idx_learning_groups_owner ON learning_groups(owner_id);
         CREATE INDEX IF NOT EXISTS idx_learning_members_user ON learning_members(user_id);
         CREATE INDEX IF NOT EXISTS idx_learning_assignments_group ON learning_assignments(group_id);
@@ -316,7 +320,11 @@ class Learning:
                       (submission_id, item_id, user_id, data.code, hashlib.sha256(data.code.encode()).hexdigest(),
                        json.dumps(reports, ensure_ascii=False), int(all(r['passed'] for r in reports)),
                        data.explanation.strip(), data.changed_code, data.change_explanation.strip(), now()))
-            return self.serialize(c.execute('SELECT * FROM learning_submissions WHERE id=?', (submission_id,)).fetchone())
+            c.execute('INSERT INTO learning_submission_input_reports VALUES (?, ?)',
+                      (submission_id, int(data.code_paste_detected)))
+            result = self.serialize(c.execute('SELECT * FROM learning_submissions WHERE id=?', (submission_id,)).fetchone())
+            result['code_paste_detected'] = data.code_paste_detected
+            return result
 
     def submission(self, submission_id, user_id):
         with self.connect() as c:
@@ -327,6 +335,8 @@ class Learning:
             if row['user_id'] != user_id and group['owner_id'] != user_id:
                 raise HTTPException(404, 'Submission not found')
             result = self.serialize(row)
+            input_report = c.execute('SELECT code_paste_detected FROM learning_submission_input_reports WHERE submission_id=?', (submission_id,)).fetchone()
+            result['code_paste_detected'] = bool(input_report[0]) if input_report else None
             result.update(title=content['title'], defense_questions=content['defense_questions'], change=content['change'],
                           tests=content['tests'], group_id=group['id'], is_owner=group['owner_id'] == user_id,
                           can_manage=group['owner_id'] == user_id)

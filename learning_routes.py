@@ -45,6 +45,7 @@ class SubmissionCreate(BaseModel):
     results: list[CaseReport] = Field(min_length=1, max_length=10)
     explanation: Reflection
     changed_code: Code
+    code_paste_detected: bool = False
     change_explanation: Reflection
 
 
