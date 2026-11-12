@@ -35,6 +35,18 @@ class LearningWorkflowTests(unittest.TestCase):
         self.call('POST','/groups/join',self.student,{'code':self.group['join_code']})
         self.assignment=self.call('POST',f"/groups/{self.group['id']}/assignments",self.teacher,{'template_id':'sum-js'},201)['id']
 
+    def test_board_exposes_only_own_latest_attempt_data(self):
+        self.call('POST','/groups/join',self.outsider,{'code':self.group['join_code']})
+        mine=self.call('POST',f"/assignments/{self.assignment}/submissions",self.student,self.payload(),201)
+        other=self.call('POST',f"/assignments/{self.assignment}/submissions",self.outsider,self.payload(),201)
+        learner=self.call('GET',f"/groups/{self.group['id']}",self.student)
+        self.assertEqual([s['id'] for s in learner['my_submissions']], [mine['id']])
+        self.assertNotIn('members',learner)
+        self.assertNotIn('submissions',learner)
+        self.assertEqual(learner['member_count'],2)
+        teacher=self.call('GET',f"/groups/{self.group['id']}",self.teacher)
+        self.assertEqual({s['id'] for s in teacher['submissions']},{mine['id'],other['id']})
+
     def tearDown(self):
         self.client.__exit__(None,None,None); self.patch.stop(); self.tmp.cleanup()
 

@@ -189,6 +189,13 @@ class Learning:
                 item = {'id': row['id'], 'template_id': content.get('id'), 'title': content['title'], 'language': content['language']}
                 item.update(catalog_metadata(content))
                 group['assignments'].append(item)
+            group['member_count'] = c.execute('SELECT COUNT(*) FROM learning_members WHERE group_id=?', (group_id,)).fetchone()[0]
+            teacher = c.execute('SELECT display_name FROM users WHERE id=?', (group['owner_id'],)).fetchone()
+            group['teacher_name'] = teacher['display_name'] if teacher else None
+            if not owner:
+                group['my_submissions'] = [dict(r) for r in c.execute('''SELECT s.id, s.assignment_id, s.status, s.tests_passed, s.created_at
+                    FROM learning_submissions s JOIN learning_assignments a ON a.id=s.assignment_id
+                    WHERE a.group_id=? AND s.user_id=? ORDER BY s.created_at DESC, s.id DESC''', (group_id, user_id))]
             if owner:
                 group['members'] = [dict(r) for r in c.execute('''SELECT u.id, u.display_name FROM learning_members m
                     JOIN users u ON u.id=m.user_id WHERE group_id=? ORDER BY joined_at''', (group_id,))]
