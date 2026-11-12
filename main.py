@@ -49,6 +49,7 @@ metrics = get_metrics()
 analysis_limiter = RateLimiter(requests_per_minute=5, requests_per_hour=60)
 login_limiter = RateLimiter(10, 50)
 reset_limiter = RateLimiter(3, 3)
+verification_limiter = RateLimiter(5, 10)
 DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(24))
 LANGUAGE_BY_EXTENSION = {
     ".py": "Python", ".js": "JavaScript", ".jsx": "JavaScript/JSX", ".ts": "TypeScript",
@@ -217,8 +218,8 @@ async def register(user: UserRegister, request: Request):
         if not allowed:
             raise HTTPException(429, "Too many registration attempts", headers={"Retry-After": str(info['retry_after'])})
     verify = require_email_verification()
-    token = secrets.token_urlsafe(32)
-    token_hash = hashlib.sha256(token.encode()).hexdigest() if verify else None
+    token = f"{secrets.randbelow(100_000_000):08d}"
+    token_hash = hashlib.sha256((email + ":" + token).encode()).hexdigest() if verify else None
     expires = (datetime.now() + timedelta(minutes=30)).isoformat() if verify else None
     user_id = db.create_user(
         email, hash_password(user.password), user.display_name, token_hash, expires,
@@ -244,9 +245,15 @@ async def register(user: UserRegister, request: Request):
 
 @app.post("/auth/verify-email", response_model=TokenResponse)
 async def verify_email(email: str, code: str):
-    if not is_valid_email(email) or not code or len(code) < 10:
+    email = email.lower().strip()
+    code = code.strip()
+    identity = hashlib.sha256(email.encode()).hexdigest()
+    allowed, info = verification_limiter.is_allowed(identity)
+    if not allowed:
+        raise HTTPException(429, "Too many verification attempts", headers={"Retry-After": str(info['retry_after'])})
+    if not is_valid_email(email) or not code or not (len(code) == 8 and code.isascii() and code.isdigit() or 10 <= len(code) <= 64):
         raise HTTPException(status_code=400, detail="Invalid verification details")
-    user = db.verify_user_email(hashlib.sha256(code.encode()).hexdigest(), email.lower().strip())
+    user = db.verify_user_email(hashlib.sha256((email + ":" + code if len(code) == 8 else code).encode()).hexdigest(), email)
     if not user or user["email"].lower() != email.lower().strip():
         raise HTTPException(status_code=400, detail="Invalid or expired verification code")
     return TokenResponse(access_token=create_access_token(user["id"], user["email"], user["token_version"]), user=UserResponse(**db.get_user_by_id(user["id"])))

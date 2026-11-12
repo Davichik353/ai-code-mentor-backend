@@ -28,7 +28,7 @@ class MailDeliveryTests(unittest.TestCase):
 
     def test_verification_required_and_bound_to_email(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ,BREVO), patch.object(main,'db',Database(tmp+'/test.sqlite')), patch('main.send_verification_email') as send:
-            for limiter in (main.registration_ip_limiter,main.registration_email_limiter,main.api_limiter,main.auth_ip_limiter,main.login_limiter): limiter.clear()
+            for limiter in (main.registration_ip_limiter,main.registration_email_limiter,main.api_limiter,main.auth_ip_limiter,main.login_limiter,main.verification_limiter): limiter.clear()
             with TestClient(main.app) as client:
                 credentials={'email':'new@example.com','password':'Strong-Test-Password1!'}
                 response=client.post('/auth/register',json=credentials)
@@ -37,6 +37,7 @@ class MailDeliveryTests(unittest.TestCase):
                 self.assertFalse(response.json().get('access_token'))
                 self.assertEqual(client.post('/auth/login',json=credentials).status_code,403)
                 token=send.call_args.args[1]
+                self.assertRegex(token, r"^[0-9]{8}$")
                 self.assertEqual(client.post('/auth/verify-email',params={'email':'wrong@example.com','code':token}).status_code,400)
                 self.assertEqual(main.db.get_user_by_email('new@example.com')['email_verified'],0)
                 self.assertEqual(client.post('/auth/verify-email',params={'email':credentials['email'],'code':token}).status_code,200)
