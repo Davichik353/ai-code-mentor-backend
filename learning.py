@@ -234,6 +234,17 @@ class Learning:
                       (item_id, group_id, json.dumps(TEMPLATES[template_id], ensure_ascii=False), now()))
             return {'id': item_id}
 
+    def assign_custom(self, group_id, user_id, content):
+        with self.connect() as c:
+            self.require_active(self.group(c, group_id, user_id, owner_only=True))
+            if c.execute('SELECT COUNT(*) FROM learning_assignments WHERE group_id=?', (group_id,)).fetchone()[0] >= 100:
+                raise HTTPException(409, 'Assignment limit reached')
+            item_id = secrets.token_hex(12)
+            content['id'] = 'custom-' + item_id
+            c.execute('INSERT INTO learning_assignments VALUES (?, ?, ?, ?)',
+                      (item_id, group_id, json.dumps(content, ensure_ascii=False), now()))
+            return {'id': item_id}
+
     def assignment(self, c, item_id, user_id):
         row = c.execute('SELECT * FROM learning_assignments WHERE id=?', (item_id,)).fetchone()
         if not row:

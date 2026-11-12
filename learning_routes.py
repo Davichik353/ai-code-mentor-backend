@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, StringConstraints
 from learning import Learning, catalog_metadata
 from learning_content import TEMPLATES, GLOSSARY
+from assignment_import import ImportRequest, TaskDraft, generate_drafts, content_from_draft
 from performance import RateLimiter
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
@@ -55,6 +56,7 @@ class Review(BaseModel):
 def learning_router(get_db, current_user):
     router = APIRouter(prefix='/learning', tags=['Learning'])
     join_limiter = RateLimiter(10, 60)
+    import_limiter = RateLimiter(2, 10)
 
     def store():
         return Learning(get_db().db_path)
@@ -110,6 +112,20 @@ def learning_router(get_db, current_user):
     @router.post('/groups/{group_id}/assignments', status_code=201)
     def assign(group_id: str, data: AssignmentCreate, user=Depends(current_user)):
         return store().assign(group_id, user['id'], data.template_id)
+
+    @router.post('/groups/{group_id}/assignment-drafts')
+    async def import_tasks(group_id: str, data: ImportRequest, user=Depends(current_user)):
+        db = store()
+        with db.connect() as c:
+            db.require_active(db.group(c, group_id, user['id'], owner_only=True))
+        allowed, info = import_limiter.is_allowed(user['id'])
+        if not allowed:
+            raise HTTPException(429, 'Лимит импорта: попробуйте позже.', headers={'Retry-After': str(info['retry_after'])})
+        return await generate_drafts(data)
+
+    @router.post('/groups/{group_id}/custom-assignments', status_code=201)
+    def publish_task(group_id: str, data: TaskDraft, user=Depends(current_user)):
+        return store().assign_custom(group_id, user['id'], content_from_draft(data))
 
     @router.get('/assignments/{item_id}')
     def assignment(item_id: str, user=Depends(current_user)):
