@@ -50,6 +50,8 @@ analysis_limiter = RateLimiter(requests_per_minute=5, requests_per_hour=60)
 login_limiter = RateLimiter(10, 50)
 reset_limiter = RateLimiter(3, 3)
 verification_limiter = RateLimiter(5, 10)
+resend_email_limiter = RateLimiter(1, 3)
+resend_ip_limiter = RateLimiter(3, 10)
 DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(24))
 LANGUAGE_BY_EXTENSION = {
     ".py": "Python", ".js": "JavaScript", ".jsx": "JavaScript/JSX", ".ts": "TypeScript",
@@ -242,6 +244,29 @@ async def register(user: UserRegister, request: Request):
         db.delete_user(user_id)
         raise HTTPException(status_code=503, detail="Email verification is temporarily unavailable")
     return RegistrationResponse(message="Check your email for the verification code", email=email)
+
+@app.post("/auth/resend-verification")
+def resend_verification(user: UserLogin, request: Request):
+    email = user.email.lower().strip()
+    identity = hashlib.sha256(email.encode()).hexdigest()
+    for limiter, key in ((resend_email_limiter, identity), (resend_ip_limiter, request.client.host if request.client else "unknown")):
+        allowed, info = limiter.is_allowed(key)
+        if not allowed:
+            raise HTTPException(429, "Please wait before requesting another code", headers={"Retry-After": str(info['retry_after'])})
+    record = db.get_user_by_email(email)
+    valid = verify_password(user.password, record['password_hash'] if record else DUMMY_PASSWORD_HASH)
+    if not record or not valid:
+        raise HTTPException(401, "Incorrect email or password")
+    if record['email_verified']:
+        return {'message': 'Email already verified. Sign in.'}
+    token = f"{secrets.randbelow(100_000_000):08d}"
+    try:
+        send_verification_email(email, token)
+    except Exception:
+        raise HTTPException(503, "Email verification is temporarily unavailable")
+    db.replace_verification_code(record['id'], hashlib.sha256((email + ':' + token).encode()).hexdigest(),
+                                 (datetime.now() + timedelta(minutes=30)).isoformat())
+    return {'message': 'A new code has been sent. Use the latest email.'}
 
 @app.post("/auth/verify-email", response_model=TokenResponse)
 async def verify_email(email: str, code: str):

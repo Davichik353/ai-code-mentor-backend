@@ -232,6 +232,12 @@ class Database:
         finally:
             conn.close()
 
+    def replace_verification_code(self, user_id, token_hash, expires):
+        with closing(connect(self.db_path)) as conn:
+            conn.execute('UPDATE users SET verification_token_hash=?, verification_expires_at=? WHERE id=? AND email_verified=0',
+                         (token_hash, expires, user_id))
+            conn.commit()
+
     def verify_user_email(self, token_hash: str, email: str) -> Optional[Dict]:
         conn = connect(self.db_path)
         conn.row_factory = sqlite3.Row
