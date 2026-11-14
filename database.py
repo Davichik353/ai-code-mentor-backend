@@ -112,6 +112,8 @@ class Database:
                 cursor.execute("ALTER TABLE todos ADD COLUMN user_id TEXT REFERENCES users(id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_user_id ON todos(user_id)")
             init_learning_schema(conn)
+            from support import init_support_schema
+            init_support_schema(conn)
             conn.commit()
             conn.close()
             print("Database initialized successfully")
@@ -219,6 +221,7 @@ class Database:
         conn = connect(self.db_path)
         conn.execute("PRAGMA foreign_keys=ON")
         try:
+            conn.execute('DELETE FROM learning_school_staff WHERE user_id=?', (user_id,))
             conn.execute('''
                 DELETE FROM feedback_cache
                 WHERE analysis_id IN (SELECT id FROM analyses WHERE user_id = ?)

@@ -146,6 +146,8 @@ frontend_origins.update(
 from request_security import RequestSecurity
 api_limiter = RateLimiter(int(os.getenv("API_REQUESTS_PER_MINUTE", "120")), 3000)
 auth_ip_limiter = RateLimiter(int(os.getenv("AUTH_REQUESTS_PER_MINUTE", "15")), 100)
+from reliability import ErrorMonitoring
+app.add_middleware(ErrorMonitoring)
 app.add_middleware(RequestSecurity, general=api_limiter, auth=auth_ip_limiter)
 app.add_middleware(
     CORSMiddleware,
@@ -156,6 +158,8 @@ app.add_middleware(
 )
 
 app.include_router(learning_router(lambda: db, current_user))
+from support import support_router
+app.include_router(support_router(lambda: db, current_user))
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://ai-code-mentor-frontend-iota.vercel.app").rstrip("/")
 
@@ -363,7 +367,6 @@ async def delete_account(user=Depends(current_user)):
     with Learning(db.db_path).connect() as c:
         if c.execute('SELECT 1 FROM learning_schools WHERE admin_id=?',(user['id'],)).fetchone() or c.execute('SELECT 1 FROM learning_groups g JOIN learning_school_groups s ON s.group_id=g.id WHERE g.owner_id=?',(user['id'],)).fetchone():
             raise HTTPException(409,'Перед удалением аккаунта передайте школу и её группы другому преподавателю.')
-        c.execute('DELETE FROM learning_school_staff WHERE user_id=?',(user['id'],))
     try:
         if not db.delete_user(user["id"]):
             raise HTTPException(status_code=404, detail="Account not found")

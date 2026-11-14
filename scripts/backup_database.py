@@ -100,6 +100,8 @@ def restore(source, output, key):
         with closing(sqlite3.connect(check)) as conn:
             if conn.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                 raise RuntimeError('Restore integrity check failed')
+            if conn.execute('PRAGMA foreign_key_check').fetchall():
+                raise RuntimeError('Restore foreign keys invalid')
         fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, 'wb') as stream:
             stream.write(raw)
