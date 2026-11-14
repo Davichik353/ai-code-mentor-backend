@@ -8,6 +8,8 @@ import sqlite3
 from storage import connect
 from fastapi import HTTPException
 from learning_content import TEMPLATES
+from learning_product import ProductFeatures, init_product_schema
+from judge import configured, run_cases, public_results
 
 
 def now():
@@ -70,6 +72,7 @@ def init_learning_schema(conn):
         CREATE INDEX IF NOT EXISTS idx_learning_submissions_assignment ON learning_submissions(assignment_id);
     ''')
 
+    init_product_schema(conn)
 
 def catalog_metadata(content):
     """Enrich older assignment snapshots without modifying their stored content."""
@@ -81,7 +84,7 @@ def catalog_metadata(content):
     return {key: content.get(key) or current.get(key) or value for key, value in defaults.items()}
 
 
-class Learning:
+class Learning(ProductFeatures):
     def __init__(self, path):
         self.path = path
 
@@ -186,6 +189,8 @@ class Learning:
                 raise HTTPException(404, 'Join code not found')
             if c.execute('SELECT 1 FROM learning_group_archives WHERE group_id=?', (row['id'],)).fetchone():
                 raise HTTPException(409, 'Group is archived')
+            if c.execute('SELECT 1 FROM learning_removed_members WHERE group_id=? AND user_id=?',(row['id'],user_id)).fetchone():
+                raise HTTPException(403,'Membership removed')
             if row['owner_id'] != user_id:
                 c.execute('UPDATE learning_groups SET title=title WHERE id=?', (row['id'],))
                 member = c.execute('SELECT 1 FROM learning_members WHERE group_id=? AND user_id=?', (row['id'], user_id)).fetchone()
@@ -220,6 +225,8 @@ class Learning:
                 content = json.loads(row['content'])
                 item = {'id': row['id'], 'template_id': content.get('id'), 'title': content['title'], 'language': content['language']}
                 item.update(catalog_metadata(content))
+                item.update(self.settings(c,row['id']))
+                item.pop('assignment_id',None)
                 group['assignments'].append(item)
             group['member_count'] = c.execute('SELECT COUNT(*) FROM learning_members WHERE group_id=?', (group_id,)).fetchone()[0]
             teacher = c.execute('SELECT display_name FROM users WHERE id=?', (group['owner_id'],)).fetchone()
@@ -229,12 +236,18 @@ class Learning:
                     FROM learning_submissions s JOIN learning_assignments a ON a.id=s.assignment_id
                     WHERE a.group_id=? AND s.user_id=? ORDER BY s.created_at DESC, s.id DESC''', (group_id, user_id))]
             if owner:
+                group['removed_members']=[dict(r) for r in c.execute('SELECT u.id,u.display_name FROM learning_removed_members m JOIN users u ON u.id=m.user_id WHERE m.group_id=?',(group_id,))]
                 group['members'] = [dict(r) for r in c.execute('''SELECT u.id, u.display_name FROM learning_members m
                     JOIN users u ON u.id=m.user_id WHERE group_id=? ORDER BY joined_at''', (group_id,))]
                 reports = [dict(r) for r in c.execute('''SELECT s.id, s.user_id, u.display_name, s.assignment_id,
                     s.tests_passed, s.status, s.results, s.created_at FROM learning_submissions s
                     JOIN learning_assignments a ON a.id=s.assignment_id JOIN users u ON u.id=s.user_id
                     WHERE a.group_id=? ORDER BY s.created_at DESC''', (group_id,))]
+                for r in reports:
+                    grade=c.execute('SELECT score,verification FROM learning_grades WHERE submission_id=?',(r['id'],)).fetchone()
+                    r.update(dict(grade) if grade else {'score':None,'verification':'browser_report_unverified'})
+                    due=self.settings(c,r['assignment_id'])['due_at']
+                    r['late']=bool(due and r['created_at']>due)
                 # Latest attempt per learner/assignment prevents repeated attempts inflating the class picture.
                 latest = {}
                 for r in reports:
@@ -291,11 +304,19 @@ class Learning:
             revealed = progress['revealed'] if progress else 0
             result = {k: v for k, v in content.items() if k not in ('solution', 'hints', 'id')}
             result.update(catalog_metadata(content))
+            settings=self.settings(c,item_id)
+            result.update(settings)
+            result['judge_available']=configured()
+            result['test_count']=len(content['tests'])
+            if settings['server_check'] and group['owner_id']!=user_id:
+                result['tests']=[]
             result.update(id=item_id, group_id=group['id'], is_owner=group['owner_id'] == user_id,
                           can_manage=group['owner_id'] == user_id, archived=group['archived'],
                           can_submit=group['owner_id'] != user_id and not group['archived'],
-                          hints=content['hints'][:revealed], hint_count=len(content['hints']),
+                          hints=content['hints'][:revealed] if settings['hints_allowed'] or group['owner_id']==user_id else [], hint_count=len(content['hints']),
                           submissions=[self.serialize(r) for r in c.execute('SELECT * FROM learning_submissions WHERE assignment_id=? AND user_id=? ORDER BY created_at DESC', (item_id, user_id))])
+            for work in result['submissions']:
+                self.enrich_submission(c,work,group['owner_id']==user_id)
             return result
 
     def hint(self, item_id, user_id):
@@ -303,6 +324,8 @@ class Learning:
             _, content, group = self.assignment(c, item_id, user_id)
             if group['owner_id'] == user_id:
                 raise HTTPException(403, 'Hints are for learners')
+            if not self.settings(c,item_id)['hints_allowed']:
+                raise HTTPException(403,'Hints disabled')
             c.execute('INSERT OR IGNORE INTO learning_hints (assignment_id, user_id) VALUES (?, ?)', (item_id, user_id))
             c.execute('UPDATE learning_hints SET revealed=MIN(revealed+1, ?) WHERE assignment_id=? AND user_id=?', (len(content['hints']), item_id, user_id))
             count = c.execute('SELECT revealed FROM learning_hints WHERE assignment_id=? AND user_id=?', (item_id, user_id)).fetchone()[0]
@@ -311,6 +334,8 @@ class Learning:
     def solution(self, item_id, user_id, reflection):
         with self.connect() as c:
             _, content, group = self.assignment(c, item_id, user_id)
+            if group['owner_id']!=user_id and not self.settings(c,item_id)['solution_allowed']:
+                raise HTTPException(403,'Solution disabled')
             progress = c.execute('SELECT revealed FROM learning_hints WHERE assignment_id=? AND user_id=?', (item_id, user_id)).fetchone()
             if group['owner_id'] != user_id and (not progress or progress[0] < len(content['hints'])):
                 raise HTTPException(409, 'Read the progressive hints before requesting the example')
@@ -325,13 +350,33 @@ class Learning:
         result['verification'] = 'browser_report_unverified'
         return result
 
+    def enrich_submission(self,c,result,owner):
+        grade=c.execute('SELECT score,verification FROM learning_grades WHERE submission_id=?',(result['id'],)).fetchone()
+        if grade: result.update(dict(grade))
+        due=self.settings(c,result['assignment_id'])['due_at']
+        result['late']=bool(due and result['created_at']>due)
+        if not owner and self.settings(c,result['assignment_id'])['server_check']:
+            result['results']=public_results(result['results'])
+            result['tests']=[]
+        return result
+
+    def execute_tests(self,item_id,user_id,code):
+        with self.connect() as c:
+            _,content,group=self.assignment(c,item_id,user_id)
+            self.require_active(group)
+            if not self.settings(c,item_id)['server_check']: raise HTTPException(409,'Server checking disabled')
+        return public_results(run_cases(code,content['language'],content['tests']))
+
     def submit(self, item_id, user_id, data):
         with self.connect() as c:
             _, content, group = self.assignment(c, item_id, user_id)
             self.require_active(group)
             if group['owner_id'] == user_id:
                 raise HTTPException(403, 'Teacher cannot submit to own assignment')
-            if len(data.results) != len(content['tests']):
+            settings=self.settings(c,item_id)
+            if settings['due_at'] and not settings['allow_late'] and now()>settings['due_at']:
+                raise HTTPException(409,'Deadline passed')
+            if not settings['server_check'] and len(data.results) != len(content['tests']):
                 raise HTTPException(422, 'Report every test case')
             if data.changed_code.strip() == data.code.strip():
                 raise HTTPException(422, 'Mini-defense requires a changed version of the code')
@@ -341,6 +386,8 @@ class Learning:
             for expected, actual in zip(content['tests'], data.results):
                 reports.append({'stdout': actual.stdout, 'error': actual.error,
                                 'passed': not actual.error and actual.stdout.strip() == expected['expected_stdout'].strip()})
+            if settings['server_check']:
+                reports=run_cases(data.code,content['language'],content['tests'])
             submission_id = secrets.token_hex(12)
             c.execute('''INSERT INTO learning_submissions
                 (id, assignment_id, user_id, code, code_hash, results, tests_passed, explanation, changed_code, change_explanation, created_at)
@@ -352,7 +399,8 @@ class Learning:
                       (submission_id, int(data.code_paste_detected)))
             result = self.serialize(c.execute('SELECT * FROM learning_submissions WHERE id=?', (submission_id,)).fetchone())
             result['code_paste_detected'] = data.code_paste_detected
-            return result
+            c.execute('INSERT INTO learning_grades (submission_id,verification) VALUES (?,?)',(submission_id,'server_verified' if settings['server_check'] else 'browser_report_unverified'))
+            return self.enrich_submission(c,result,False)
 
     def submission(self, submission_id, user_id):
         with self.connect() as c:
@@ -368,7 +416,7 @@ class Learning:
             result.update(title=content['title'], defense_questions=content['defense_questions'], change=content['change'],
                           tests=content['tests'], group_id=group['id'], is_owner=group['owner_id'] == user_id,
                           can_manage=group['owner_id'] == user_id)
-            return result
+            return self.enrich_submission(c,result,group['owner_id']==user_id)
 
     def review(self, submission_id, user_id, data):
         with self.connect() as c:
@@ -384,7 +432,9 @@ class Learning:
                 raise HTTPException(409, 'Cannot approve failing tests')
             c.execute('UPDATE learning_submissions SET status=?, feedback=?, reviewed_at=? WHERE id=?',
                       (data.decision, data.feedback.strip(), now(), submission_id))
-            return {'id': submission_id, 'status': data.decision}
+            c.execute('INSERT OR IGNORE INTO learning_grades (submission_id) VALUES (?)',(submission_id,))
+            c.execute('UPDATE learning_grades SET score=? WHERE submission_id=?',(data.score,submission_id))
+            return {'id': submission_id, 'status': data.decision, 'score':data.score}
 
     def portfolio(self, user_id=None, slug=None):
         with self.connect() as c:

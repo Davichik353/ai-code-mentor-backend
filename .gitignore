@@ -20,5 +20,4 @@ venv/
 *.backup
 *.fernet
 backups/
-8}
 download

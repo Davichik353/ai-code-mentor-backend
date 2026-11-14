@@ -359,6 +359,11 @@ def update_account_profile(body: ProfileUpdateRequest, user=Depends(current_user
 @app.delete("/auth/account")
 async def delete_account(user=Depends(current_user)):
     """Delete the authenticated account and its private analysis data."""
+    from learning import Learning
+    with Learning(db.db_path).connect() as c:
+        if c.execute('SELECT 1 FROM learning_schools WHERE admin_id=?',(user['id'],)).fetchone() or c.execute('SELECT 1 FROM learning_groups g JOIN learning_school_groups s ON s.group_id=g.id WHERE g.owner_id=?',(user['id'],)).fetchone():
+            raise HTTPException(409,'Перед удалением аккаунта передайте школу и её группы другому преподавателю.')
+        c.execute('DELETE FROM learning_school_staff WHERE user_id=?',(user['id'],))
     try:
         if not db.delete_user(user["id"]):
             raise HTTPException(status_code=404, detail="Account not found")

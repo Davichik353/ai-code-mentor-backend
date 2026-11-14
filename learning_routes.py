@@ -5,6 +5,7 @@ from learning import Learning, catalog_metadata
 from learning_content import TEMPLATES, GLOSSARY
 from assignment_import import ImportRequest, TaskDraft, generate_drafts, content_from_draft
 from performance import RateLimiter
+from learning_product_routes import add_product_routes
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 Reflection = Annotated[str, StringConstraints(strip_whitespace=True, min_length=20, max_length=3000)]
@@ -57,12 +58,14 @@ class SubmissionCreate(BaseModel):
 class Review(BaseModel):
     decision: Literal['approved', 'needs_revision']
     feedback: Reflection
+    score: int | None = Field(default=None,ge=0,le=100,strict=True)
 
 
 def learning_router(get_db, current_user):
     router = APIRouter(prefix='/learning', tags=['Learning'])
     join_limiter = RateLimiter(10, 60)
     import_limiter = RateLimiter(2, 10)
+    submit_limiter = RateLimiter(6, 60)
 
     def store():
         return Learning(get_db().db_path)
@@ -151,6 +154,8 @@ def learning_router(get_db, current_user):
 
     @router.post('/assignments/{item_id}/submissions', status_code=201)
     def submit(item_id: str, data: SubmissionCreate, user=Depends(current_user)):
+        allowed, info = submit_limiter.is_allowed(user['id'])
+        if not allowed: raise HTTPException(429, 'Submission rate limit', headers={'Retry-After':str(info['retry_after'])})
         return store().submit(item_id, user['id'], data)
 
     @router.get('/submissions/{item_id}')
@@ -172,4 +177,5 @@ def learning_router(get_db, current_user):
             raise HTTPException(404, 'Portfolio not found')
         return store().portfolio(slug=slug)
 
+    add_product_routes(router, store, current_user)
     return router
