@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   backup:
-    if: vars.BACKUPS_ENABLED == 'true'
+    if: github.event_name == 'workflow_dispatch' || vars.BACKUPS_ENABLED != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -18,7 +18,7 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Back up and verify recovery
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL || secrets.POSTGRES_MIGRATION_URL }}
           TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_BACKUP_TOKEN || secrets.TURSO_AUTH_TOKEN }}
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
@@ -35,3 +35,9 @@ jobs:
           name: encrypted-database-${{ github.run_id }}
           path: ${{ runner.temp }}/database.fernet
           retention-days: 30
+      - name: Record verified uploaded backup
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || secrets.POSTGRES_MIGRATION_URL }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_BACKUP_TOKEN || secrets.TURSO_AUTH_TOKEN }}
+        run: python scripts/record_backup_status.py

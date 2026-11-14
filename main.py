@@ -71,6 +71,8 @@ def current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     if require_email_verification() and not user["email_verified"]:
         raise HTTPException(status_code=403, detail="Verify your email before signing in")
+    from admin import blocked
+    if blocked(db.db_path,user['id']):raise HTTPException(403,'Account blocked. Contact support.')
     return user
 
 def detect_language(filename: str) -> str:
@@ -160,6 +162,8 @@ app.add_middleware(
 app.include_router(learning_router(lambda: db, current_user))
 from support import support_router
 app.include_router(support_router(lambda: db, current_user))
+from admin import admin_router, require_ai
+app.include_router(admin_router(lambda: db, current_user))
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://ai-code-mentor-frontend-iota.vercel.app").rstrip("/")
 
@@ -299,6 +303,8 @@ def login(user: UserLogin):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     if record["email_verified"] == 0 and require_email_verification():
         raise HTTPException(status_code=403, detail="Verify your email before signing in")
+    from admin import blocked
+    if blocked(db.db_path,record['id']):raise HTTPException(403,'Account blocked. Contact support.')
     public_user = db.get_user_by_id(record["id"])
     return TokenResponse(access_token=create_access_token(record["id"], record["email"], record["token_version"]), user=UserResponse(**public_user))
 
@@ -399,8 +405,8 @@ async def analyze_code(request: CodeAnalysisRequest, user=Depends(current_user))
         if len(request.code) > 10000:
             raise HTTPException(status_code=400, detail="Code exceeds 10000 characters")
         
-        if not db.reserve_analysis_quota(user['id'], int(os.getenv('ANALYSES_PER_USER_PER_DAY', '20')),
-                int(os.getenv('ANALYSES_TOTAL_PER_DAY', '200'))):
+        policy=require_ai(db.db_path)
+        if not db.reserve_analysis_quota(user['id'], policy['per_user'], policy['total']):
             raise HTTPException(429, "Daily analysis quota reached", headers={"Retry-After": "3600"})
         # Analyze code
         language = request.language or detect_language(request.filename or "")

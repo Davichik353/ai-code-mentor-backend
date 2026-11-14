@@ -3,6 +3,14 @@ import json
 import logging
 import time
 import uuid
+from collections import deque
+from threading import Lock
+from datetime import datetime, timezone
+
+_errors=deque(maxlen=100)
+_errors_lock=Lock()
+def recent_errors():
+    with _errors_lock:return list(reversed(_errors))
 from starlette.responses import JSONResponse
 
 logger=logging.getLogger('mentor.reliability')
@@ -30,5 +38,7 @@ class ErrorMonitoring:
         finally:
             if status>=500:
                 route=getattr(scope.get('route'),'path','unmatched')
-                logger.error(json.dumps({'event':'server_error','request_id':request_id,'route':route,
-                    'status':status,'exception_type':failure,'duration_ms':round((time.monotonic()-start)*1000)}))
+                record={'at':datetime.now(timezone.utc).isoformat(),'event':'server_error','request_id':request_id,'route':route,
+                    'status':status,'exception_type':failure,'duration_ms':round((time.monotonic()-start)*1000)}
+                with _errors_lock:_errors.append(record)
+                logger.error(json.dumps(record))

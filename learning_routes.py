@@ -134,6 +134,8 @@ def learning_router(get_db, current_user):
         allowed, info = import_limiter.is_allowed(user['id'])
         if not allowed:
             raise HTTPException(429, 'Лимит импорта: попробуйте позже.', headers={'Retry-After': str(info['retry_after'])})
+        from admin import require_ai
+        require_ai(get_db().db_path)
         return await generate_drafts(data)
 
     @router.post('/groups/{group_id}/custom-assignments', status_code=201)

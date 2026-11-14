@@ -114,6 +114,8 @@ class Database:
             init_learning_schema(conn)
             from support import init_support_schema
             init_support_schema(conn)
+            from admin import init_admin_schema
+            init_admin_schema(conn)
             conn.commit()
             conn.close()
             print("Database initialized successfully")

@@ -96,6 +96,8 @@ def add_product_routes(router,store,current_user):
             if not db.settings(c,item_id)['hints_allowed']: raise HTTPException(403,'Hints disabled')
             history=[dict(r) for r in c.execute('SELECT code,feedback FROM learning_submissions WHERE assignment_id=? AND user_id=? ORDER BY created_at DESC LIMIT 2',(item_id,user['id']))]
         limit(mentor_limiter,user)
+        from admin import require_ai
+        require_ai(db.path)
         return await advise(content,data.code,data.question,history,data.locale)
 
     @router.get('/schools')

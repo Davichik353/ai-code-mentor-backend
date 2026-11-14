@@ -6,7 +6,7 @@ import psycopg
 from psycopg import sql
 
 TABLES = (
-    'users', 'analyses', 'feedback_cache', 'todos', 'analysis_quotas', 'ai_usage',
+    'admin_user_blocks', 'admin_audit', 'users', 'analyses', 'feedback_cache', 'todos', 'analysis_quotas', 'ai_usage',
     'learning_profiles', 'learning_groups', 'learning_group_archives', 'learning_group_settings',
     'learning_members', 'learning_assignments', 'learning_hints', 'learning_submissions',
     'learning_submission_input_reports', 'learning_assignment_settings', 'learning_grades',
