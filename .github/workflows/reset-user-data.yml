@@ -1,0 +1,28 @@
+name: Reset all user data (manual only)
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type DELETE_ALL_USERS to remove all accounts and related classroom data'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: database-migration
+  cancel-in-progress: false
+jobs:
+  reset:
+    if: inputs.confirmation == 'DELETE_ALL_USERS'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install 'psycopg[binary]>=3.2,<4'
+      - name: Reset and verify account tables
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL || secrets.POSTGRES_MIGRATION_URL }}
+        run: python scripts/reset_user_data.py --confirm DELETE_ALL_USERS
