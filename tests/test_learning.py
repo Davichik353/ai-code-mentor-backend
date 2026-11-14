@@ -35,6 +35,32 @@ class LearningWorkflowTests(unittest.TestCase):
         self.call('POST','/groups/join',self.student,{'code':self.group['join_code']})
         self.assignment=self.call('POST',f"/groups/{self.group['id']}/assignments",self.teacher,{'template_id':'sum-js'},201)['id']
 
+    def test_group_settings_and_capacity(self):
+        path = f"/groups/{self.group['id']}/settings"
+        values = {'title': 'New group name', 'student_limit': 1}
+        self.call('POST', path, self.student, values, 404)
+        self.call('POST', path, self.outsider, values, 404)
+        self.call('POST', path, None, values, 401)
+        for invalid in ({**values, 'title':'  '}, {**values, 'student_limit':0}, {**values, 'student_limit':1.5}, {**values, 'student_limit':501}):
+            self.call('POST', path, self.teacher, invalid, 422)
+        saved = self.call('POST', path, self.teacher, values)
+        self.assertEqual(saved['title'], values['title'])
+        self.assertEqual(saved['member_count'], 1)
+        self.assertEqual(saved['student_limit'], 1)
+        listed = self.call('GET', '/groups', self.teacher)[0]
+        self.assertEqual(listed['student_limit'], 1)
+        detail = self.call('GET', f"/groups/{self.group['id']}", self.student)
+        self.assertEqual(detail['title'], values['title'])
+        self.call('POST', '/groups/join', self.student, {'code':self.group['join_code']})
+        self.call('POST', '/groups/join', self.outsider, {'code':self.group['join_code']},409)
+        self.call('POST', path, self.teacher, {**values, 'student_limit':2})
+        self.call('POST', '/groups/join', self.outsider, {'code':self.group['join_code']})
+        self.call('POST', path, self.teacher, values,409)
+        self.call('POST', path, self.teacher, {**values, 'student_limit':None})
+        self.assertIsNone(self.call('GET', '/groups', self.teacher)[0]['student_limit'])
+        self.call('POST', f"/groups/{self.group['id']}/archive", self.teacher,{})
+        self.call('POST', path, self.teacher, values,409)
+
     def test_paste_report_is_saved_and_visible_to_teacher_only(self):
         payload = {**self.payload(), 'code_paste_detected': True}
         attempt = self.call('POST', f'/assignments/{self.assignment}/submissions', self.student, payload, 201)

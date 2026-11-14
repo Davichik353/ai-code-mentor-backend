@@ -23,6 +23,11 @@ class GroupCreate(BaseModel):
     description: str = Field(default='', max_length=1000)
 
 
+class GroupUpdate(BaseModel):
+    title: Title
+    student_limit: int | None = Field(default=None, ge=1, le=500, strict=True)
+
+
 class JoinGroup(BaseModel):
     code: str = Field(min_length=6, max_length=64)
 
@@ -93,6 +98,10 @@ def learning_router(get_db, current_user):
         if not allowed:
             raise HTTPException(429, 'Join limit reached', headers={'Retry-After': str(info['retry_after'])})
         return store().join(user['id'], data.code)
+
+    @router.post('/groups/{group_id}/settings')
+    def update_group(group_id: str, data: GroupUpdate, user=Depends(current_user)):
+        return store().update_group(group_id, user['id'], data)
 
     @router.post('/groups/{group_id}/archive')
     def archive(group_id: str, user=Depends(current_user)):

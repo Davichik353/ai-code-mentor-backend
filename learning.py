@@ -31,6 +31,10 @@ def init_learning_schema(conn):
             group_id TEXT PRIMARY KEY REFERENCES learning_groups(id) ON DELETE CASCADE,
             archived_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS learning_group_settings (
+            group_id TEXT PRIMARY KEY REFERENCES learning_groups(id) ON DELETE CASCADE,
+            student_limit INTEGER
+        );
         CREATE TABLE IF NOT EXISTS learning_members (
             group_id TEXT NOT NULL REFERENCES learning_groups(id) ON DELETE CASCADE,
             user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -115,6 +119,8 @@ class Learning:
             'SELECT 1 FROM learning_members WHERE group_id=? AND user_id=?', (group_id, user_id)).fetchone())):
             raise HTTPException(404, 'Group not found')
         result = dict(row)
+        setting = c.execute('SELECT student_limit FROM learning_group_settings WHERE group_id=?', (group_id,)).fetchone()
+        result['student_limit'] = setting[0] if setting else None
         result['archived'] = bool(c.execute('SELECT 1 FROM learning_group_archives WHERE group_id=?', (group_id,)).fetchone())
         return result
 
@@ -151,12 +157,27 @@ class Learning:
             result = []
             for row in rows:
                 item = dict(row)
+                setting = c.execute('SELECT student_limit FROM learning_group_settings WHERE group_id=?', (item['id'],)).fetchone()
+                item['student_limit'] = setting[0] if setting else None
                 item['is_owner'] = item['owner_id'] == user_id
                 item['can_manage'] = item['is_owner']
                 if not item['is_owner']:
                     item.pop('join_code')
                 result.append(item)
             return result
+
+    def update_group(self, group_id, user_id, data):
+        with self.connect() as c:
+            self.require_active(self.group(c, group_id, user_id, owner_only=True))
+            # Serialize joins and capacity edits on the same group row.
+            c.execute('UPDATE learning_groups SET title=title WHERE id=?', (group_id,))
+            count = c.execute('SELECT COUNT(*) FROM learning_members WHERE group_id=?', (group_id,)).fetchone()[0]
+            if data.student_limit is not None and data.student_limit < count:
+                raise HTTPException(409, 'Student limit below current membership')
+            c.execute('UPDATE learning_groups SET title=? WHERE id=?', (data.title, group_id))
+            c.execute('INSERT OR IGNORE INTO learning_group_settings (group_id) VALUES (?)', (group_id,))
+            c.execute('UPDATE learning_group_settings SET student_limit=? WHERE group_id=?', (data.student_limit, group_id))
+            return {**self.group(c, group_id, user_id), 'member_count': count}
 
     def join(self, user_id, code):
         with self.connect() as c:
@@ -166,6 +187,13 @@ class Learning:
             if c.execute('SELECT 1 FROM learning_group_archives WHERE group_id=?', (row['id'],)).fetchone():
                 raise HTTPException(409, 'Group is archived')
             if row['owner_id'] != user_id:
+                c.execute('UPDATE learning_groups SET title=title WHERE id=?', (row['id'],))
+                member = c.execute('SELECT 1 FROM learning_members WHERE group_id=? AND user_id=?', (row['id'], user_id)).fetchone()
+                setting = c.execute('SELECT student_limit FROM learning_group_settings WHERE group_id=?', (row['id'],)).fetchone()
+                if not member and setting and setting[0] is not None:
+                    count = c.execute('SELECT COUNT(*) FROM learning_members WHERE group_id=?', (row['id'],)).fetchone()[0]
+                    if count >= setting[0]:
+                        raise HTTPException(409, 'Group is full')
                 c.execute('INSERT OR IGNORE INTO learning_members VALUES (?, ?, ?)', (row['id'], user_id, now()))
             return {'id': row['id']}
 
