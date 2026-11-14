@@ -68,8 +68,6 @@ class ProductTests(LearningWorkflowTests):
     def test_server_grading_does_not_trust_browser_and_hides_outputs(self):
         path='/assignments/'+self.assignment
         self.call('POST',path+'/settings',self.teacher,{'server_check':True},503)
-        with patch('learning_product.configured',return_value=True,create=True):
-            pass
         with patch('judge.configured',return_value=True):
             self.call('POST',path+'/settings',self.teacher,{'server_check':True})
         detail=self.call('GET',path,self.student);self.assertEqual(detail['tests'],[])
@@ -92,3 +90,17 @@ class ProductTests(LearningWorkflowTests):
             self.call('POST',path,self.outsider,{'code':'print(1)'},404); ai.assert_not_called()
             self.call('POST',path,self.student,{'code':'print(1)','locale':'uz'})
             self.assertEqual(ai.call_args.args[-1],'uz')
+
+    def test_encrypted_backup_restores_school_and_draft(self):
+        from cryptography.fernet import Fernet
+        from scripts.backup_database import backup, restore
+        from pathlib import Path
+        import sqlite3
+        school=self.call('POST','/schools',self.teacher,{'title':'Backup school'},201)
+        self.call('POST','/assignments/'+self.assignment+'/draft',self.student,{'revision':0,'payload':{'assignmentCode':'print(123)'}})
+        key=Fernet.generate_key(); encrypted=Path(self.tmp.name)/'snapshot.fernet'; restored=Path(self.tmp.name)/'restored.sqlite3'
+        backup(encrypted,key,self.db.db_path); restore(encrypted,restored,key)
+        with sqlite3.connect(restored) as c:
+            self.assertEqual(c.execute('SELECT title FROM learning_schools WHERE id=?',(school['id'],)).fetchone()[0],'Backup school')
+            self.assertIn('print(123)',c.execute('SELECT payload FROM learning_drafts').fetchone()[0])
+            self.assertEqual(c.execute('PRAGMA foreign_key_check').fetchall(),[])
